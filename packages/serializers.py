@@ -76,3 +76,8 @@ class PackageUpdateSerializer(serializers.ModelSerializer):
                 instance.save()
         
         return instance
+
+
+class PackageStatusUpdateSerializer(serializers.Serializer):
+    package_status = serializers.ChoiceField(choices=Package.PackageStatus.choices, required=True)
+    is_active = serializers.BooleanField(required=True)

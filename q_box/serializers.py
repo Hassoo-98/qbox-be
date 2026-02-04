@@ -65,3 +65,7 @@ class QboxUpdateSerializer(serializers.ModelSerializer):
             instance.city_snapshot = ""
             instance.save(update_fields=['homeowner_name_snapshot', 'short_address_snapshot', 'city_snapshot'])
         return instance
+
+class QboxStatusUpdateSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(choices=Qbox.Status.choices, required=True)
+    is_active = serializers.BooleanField(required=True)

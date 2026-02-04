@@ -1,26 +1,28 @@
-# home_owner/views.py
-from rest_framework import generics, status, filters
+from rest_framework import generics, status
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import PageNumberPagination
-from django_filters.rest_framework import DjangoFilterBackend
-from django.core.exceptions import ObjectDoesNotExist
-from django.utils import timezone
-from datetime import timedelta
+from rest_framework import filters
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
 from .models import CustomHomeOwner
 from .serializers import (
     HomeOwnerSerializer,
     HomeOwnerCreateSerializer,
-    HomeOwnerUpdateSerializer,
     HomeOwnerStatusUpdateSerializer,
-    VerifyEmailSerializer,
-    VerifyPhoneSerializer,
-    VerifyQBoxSerializer,
-    VerifyOTPSerializer,
-    ForgotPasswordSerializer,
-    VerifyForgotPasswordOTPSerializer,
-    ResetPasswordSerializer
 )
+from utils.swagger_schema import (
+    SwaggerHelper,
+    get_serializer_schema,
+    create_success_response,
+    ValidationErrorResponse,
+    NotFoundResponse,
+    COMMON_RESPONSES,
+)
+
+# Swagger Helper for Home Owner
+swagger = SwaggerHelper(tag="Home Owner")
+
 
 class StandardResultsPagination(PageNumberPagination):
     page_size = 10
@@ -29,204 +31,26 @@ class StandardResultsPagination(PageNumberPagination):
     page_query_param = "page"
 
 
-class HomeOwnerSignUpAPIView(generics.CreateAPIView):
-    """
-    POST: Home owner registration (sign up)
-    """
-    queryset = CustomHomeOwner.objects.all()
-    serializer_class = HomeOwnerCreateSerializer
-    permission_classes = [AllowAny]
-
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        try:
-            serializer.is_valid(raise_exception=True)
-            homeowner = serializer.save()
-            data = HomeOwnerSerializer(homeowner).data
-            return Response({
-                "success": True,
-                "statusCode": status.HTTP_201_CREATED,
-                "data": data,
-                "message": "Home owner account created successfully. Please verify your email/phone."
-            }, status=status.HTTP_201_CREATED)
-        except Exception as e:
-            return Response({
-                "success": False,
-                "statusCode": status.HTTP_400_BAD_REQUEST,
-                "message": str(e)
-            }, status=status.HTTP_400_BAD_REQUEST)
-
-
-class VerifyEmailAPIView(generics.GenericAPIView):
-    """
-    POST: Send email verification OTP
-    """
-    serializer_class = VerifyEmailSerializer
-    permission_classes = [AllowAny]
-
-    def post(self, request):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        email = serializer.validated_data['email']
-        
-        try:
-            user = CustomHomeOwner.objects.get(email=email)
-            otp = CustomHomeOwner.generate_otp()
-            user.email_otp = otp
-            user.save()
-            # In production, send this OTP via email
-            return Response({
-                "success": True,
-                "statusCode": status.HTTP_200_OK,
-                "data": {"otp_key": otp},  # Only for testing/dev
-                "message": "OTP sent to your email"
-            })
-        except ObjectDoesNotExist:
-            return Response({
-                "success": False,
-                "statusCode": status.HTTP_404_NOT_FOUND,
-                "message": "User with this email not found"
-            })
-
-
-# Similar for phone and qbox — just change field & message
-class VerifyPhoneAPIView(generics.GenericAPIView):
-    """
-    POST: Send phone verification OTP
-    """
-    serializer_class = VerifyPhoneSerializer
-    permission_classes = [AllowAny]
-
-    def post(self, request):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        phone = serializer.validated_data['phone_number']
-        
-        try:
-            user = CustomHomeOwner.objects.get(phone_number=phone)
-            otp = CustomHomeOwner.generate_otp()
-            user.phone_otp = otp
-            user.save()
-            # In production, send this OTP via SMS
-            return Response({
-                "success": True,
-                "statusCode": status.HTTP_200_OK,
-                "data": {"otp_key": otp},  # Only for testing/dev
-                "message": "OTP sent to your phone"
-            })
-        except ObjectDoesNotExist:
-            return Response({
-                "success": False,
-                "statusCode": status.HTTP_404_NOT_FOUND,
-                "message": "User with this phone number not found"
-            })
-
-
-class VerifyOTPAPIView(generics.GenericAPIView):
-    """
-    POST: Verify OTP for email or phone
-    """
-    serializer_class = VerifyOTPSerializer
-    permission_classes = [AllowAny]
-
-    def post(self, request):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        email = serializer.validated_data['email']
-        otp = serializer.validated_data['otp']
-        verification_type = serializer.validated_data['verification_type']
-        
-        try:
-            user = CustomHomeOwner.objects.get(email=email)
-            
-            if verification_type == 'email':
-                if user.email_otp == otp:
-                    user.email_verified = True
-                    user.email_otp = None
-                    user.save()
-                    return Response({
-                        "success": True,
-                        "statusCode": status.HTTP_200_OK,
-                        "message": "Email verified successfully"
-                    })
-                else:
-                    return Response({
-                        "success": False,
-                        "statusCode": status.HTTP_400_BAD_REQUEST,
-                        "message": "Invalid OTP"
-                    })
-            
-            elif verification_type == 'phone':
-                if user.phone_otp == otp:
-                    user.phone_verified = True
-                    user.phone_otp = None
-                    user.save()
-                    return Response({
-                        "success": True,
-                        "statusCode": status.HTTP_200_OK,
-                        "message": "Phone number verified successfully"
-                    })
-                else:
-                    return Response({
-                        "success": False,
-                        "statusCode": status.HTTP_400_BAD_REQUEST,
-                        "message": "Invalid OTP"
-                    })
-                    
-        except ObjectDoesNotExist:
-            return Response({
-                "success": False,
-                "statusCode": status.HTTP_404_NOT_FOUND,
-                "message": "User with this email not found"
-            })
-
-
-class VerifyQBoxAPIView(generics.GenericAPIView):
-    serializer_class = VerifyQBoxSerializer
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        qbox_id = serializer.validated_data['qbox_id']
-        
-        try:
-            user = CustomHomeOwner.objects.get(qbox_id=qbox_id)
-            if user != request.user:
-                return Response({
-                    "success": False,
-                    "statusCode": status.HTTP_403_FORBIDDEN,
-                    "message": "This QBox ID belongs to another user"
-                })
-            user.is_verified = True
-            user.save()
-            return Response({
-                "success": True,
-                "statusCode": status.HTTP_200_OK,
-                "message": "QBox ID verified successfully"
-            })
-        except ObjectDoesNotExist:
-            return Response({
-                "success": False,
-                "statusCode": status.HTTP_404_NOT_FOUND,
-                "message": "Invalid QBox ID"
-            })
-
-
 class HomeOwnerListAPIView(generics.ListAPIView):
-    """
-    GET: List all home owners (admin only usually)
-    """
+    '''
+    Get: list all home owners with pagination and filters
+    '''
     queryset = CustomHomeOwner.objects.all()
     serializer_class = HomeOwnerSerializer
-    permission_classes = [IsAuthenticated]           # ← change to custom admin perm if needed
+    permission_classes = [IsAuthenticated]
     pagination_class = StandardResultsPagination
-    filter_backends = [filters.SearchFilter, DjangoFilterBackend, filters.OrderingFilter]
-    search_fields = ["full_name", "email", "phone_number", "qbox_id"]
-    ordering_fields = ["full_name", "date_joined", "is_active"]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ["name", "email", "phone_number"]
+    ordering_fields = ["name", "email", "phone_number"]
     ordering = ["-date_joined"]
-    filterset_fields = ["is_active", "is_verified"]
 
+    @swagger_auto_schema(
+        **swagger.list_operation(
+            summary="List all home owners",
+            description="Retrieve a paginated list of all home owners with optional filtering by search query, ordering, and active status.",
+            serializer=HomeOwnerSerializer
+        )
+    )
     def get_paginated_response(self, data):
         return Response({
             "success": True,
@@ -238,188 +62,185 @@ class HomeOwnerListAPIView(generics.ListAPIView):
                 "limit": self.paginator.page_size,
                 "hasMore": self.paginator.page.has_next(),
             },
-            "message": "Home Owners List"
+            "message": "List Home Owners"
+        })
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response({
+            "success": True,
+            "statusCode": status.HTTP_200_OK,
+            "data": {
+                "items": serializer.data,
+                "total": len(serializer.data),
+                "page": 1,
+                "limit": queryset.count() if queryset.count() < self.pagination_class.page_size else self.pagination_class.page_size,
+                "hasMore": False
+            }
         })
 
 
+class HomeOwnerCreateAPIView(generics.CreateAPIView):
+    '''
+    Post: Create a new home owner
+    '''
+    queryset = CustomHomeOwner.objects.all()
+    serializer_class = HomeOwnerCreateSerializer
+    permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(
+        **swagger.create_operation(
+            summary="Create a new home owner",
+            description="Register a new home owner with personal information and property details.",
+            serializer=HomeOwnerCreateSerializer
+        )
+    )
+    def create(self, request, *args, **kwargs):
+        try:
+            serializer = self.get_serializer(data=request.data)
+            if serializer.is_valid(raise_exception=True):
+                home_owner = serializer.save()
+                home_owner_data = HomeOwnerSerializer(home_owner).data
+                return Response({
+                    "success": True,
+                    "statusCode": status.HTTP_201_CREATED,
+                    "data": home_owner_data,
+                    "message": "Home Owner created successfully"
+                }, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({
+                "success": False,
+                "statusCode": status.HTTP_400_BAD_REQUEST,
+                "data": None,
+                "message": str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+
+class HomeOwnerDetailAPIView(generics.RetrieveAPIView):
+    '''
+    Get: Retrieve a single home owner
+    '''
+    queryset = CustomHomeOwner.objects.all()
+    serializer_class = HomeOwnerSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = "id"
+
+    @swagger_auto_schema(
+        **swagger.retrieve_operation(
+            summary="Get home owner details",
+            description="Retrieve detailed information about a specific home owner including personal info and current status.",
+            serializer=HomeOwnerSerializer
+        )
+    )
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        return Response({
+            "success": True,
+            "statusCode": status.HTTP_200_OK,
+            "data": serializer.data,
+            "message": "Get Home Owner"
+        }, status=status.HTTP_200_OK)
+
+
+class HomeOwnerUpdateAPIView(generics.UpdateAPIView):
+    '''
+    Put: Update a home owner
+    '''
+    queryset = CustomHomeOwner.objects.all()
+    serializer_class = HomeOwnerSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = "id"
+
+    @swagger_auto_schema(
+        **swagger.update_operation(
+            summary="Update home owner",
+            description="Update home owner information such as name, phone, or active status.",
+            serializer=HomeOwnerSerializer
+        )
+    )
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response({
+            "success": True,
+            "statusCode": status.HTTP_200_OK,
+            "data": serializer.data,
+            "message": "Home Owner updated successfully"
+        }, status=status.HTTP_200_OK)
+
+
 class HomeOwnerStatusUpdateAPIView(generics.UpdateAPIView):
+    '''
+    Patch: Update home owner active status
+    '''
     queryset = CustomHomeOwner.objects.all()
     serializer_class = HomeOwnerStatusUpdateSerializer
     permission_classes = [IsAuthenticated]
     lookup_field = "id"
     http_method_names = ['patch']
 
+    @swagger_auto_schema(
+        operation_summary="[Home Owner] Update home owner status",
+        operation_description="Update home owner active status. Activating a home owner enables their account access. Deactivating temporarily suspends their access.",
+        tags=["Home Owner"],
+        request_body=HomeOwnerStatusUpdateSerializer,
+        responses={
+            200: create_success_response(
+                get_serializer_schema(HomeOwnerSerializer),
+                description="Home owner status updated successfully"
+            ),
+            400: ValidationErrorResponse,
+            404: NotFoundResponse,
+        }
+    )
     def patch(self, request, *args, **kwargs):
         return self.partial_update(request, *args, **kwargs)
 
     def partial_update(self, request, *args, **kwargs):
+        partial = True
         instance = self.get_object()
-        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
         return Response({
             "success": True,
             "statusCode": status.HTTP_200_OK,
             "data": HomeOwnerSerializer(serializer.instance).data,
-            "message": "Home owner status updated successfully"
-        })
+            "message": "Home Owner status updated successfully"
+        }, status=status.HTTP_200_OK)
 
 
 class HomeOwnerDeleteAPIView(generics.DestroyAPIView):
+    '''
+    Delete: Remove a home owner
+    '''
     queryset = CustomHomeOwner.objects.all()
+    serializer_class = HomeOwnerSerializer
     permission_classes = [IsAuthenticated]
     lookup_field = "id"
 
+    @swagger_auto_schema(
+        **swagger.delete_operation(
+            summary="Delete home owner",
+            description="Remove a home owner from the system. This action is permanent and cannot be undone."
+        )
+    )
     def destroy(self, request, *args, **kwargs):
-        instance = self.get_object()
-        data = HomeOwnerSerializer(instance).data
-        instance.delete()
+        home_owner = self.get_object()
+        home_owner_data = HomeOwnerSerializer(home_owner).data
+        home_owner.delete()
         return Response({
             "success": True,
             "statusCode": status.HTTP_200_OK,
-            "data": data,
-            "message": "Home owner account deleted successfully"
-        })
-
-
-class ForgotPasswordAPIView(generics.GenericAPIView):
-    """
-    POST: Send password reset OTP to email or phone
-    """
-    serializer_class = ForgotPasswordSerializer
-    permission_classes = [AllowAny]
-
-    def post(self, request):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        email = serializer.validated_data['email']
-        send_via = serializer.validated_data.get('send_via', 'email')
-        
-        try:
-            user = CustomHomeOwner.objects.get(email=email)
-            otp = CustomHomeOwner.generate_otp()
-            
-            if send_via == 'email':
-                user.password_reset_otp = otp
-                user.password_reset_otp_expires = timezone.now() + timedelta(minutes=10)
-                user.save()
-                # In production, send OTP via email
-                return Response({
-                    "success": True,
-                    "statusCode": status.HTTP_200_OK,
-                    "data": {"otp_key": otp},  # Only for testing/dev
-                    "message": f"Password reset OTP sent to your email"
-                })
-            elif send_via == 'phone':
-                if not user.phone_number:
-                    return Response({
-                        "success": False,
-                        "statusCode": status.HTTP_400_BAD_REQUEST,
-                        "message": "No phone number associated with this account"
-                    })
-                user.password_reset_otp = otp
-                user.password_reset_otp_expires = timezone.now() + timedelta(minutes=10)
-                user.save()
-                # In production, send OTP via SMS
-                return Response({
-                    "success": True,
-                    "statusCode": status.HTTP_200_OK,
-                    "data": {"otp_key": otp},  # Only for testing/dev
-                    "message": f"Password reset OTP sent to your phone"
-                })
-                
-        except ObjectDoesNotExist:
-            return Response({
-                "success": False,
-                "statusCode": status.HTTP_404_NOT_FOUND,
-                "message": "User with this email not found"
-            })
-
-
-class VerifyForgotPasswordOTPAPIView(generics.GenericAPIView):
-    """
-    POST: Verify password reset OTP
-    """
-    serializer_class = VerifyForgotPasswordOTPSerializer
-    permission_classes = [AllowAny]
-
-    def post(self, request):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        email = serializer.validated_data['email']
-        otp = serializer.validated_data['otp']
-        send_via = serializer.validated_data.get('send_via', 'email')
-        
-        try:
-            user = CustomHomeOwner.objects.get(email=email)
-            
-            # Check if OTP is valid and not expired
-            if (user.password_reset_otp == otp and 
-                user.password_reset_otp_expires and 
-                user.password_reset_otp_expires > timezone.now()):
-                
-                return Response({
-                    "success": True,
-                    "statusCode": status.HTTP_200_OK,
-                    "message": "OTP verified successfully. You can now reset your password."
-                })
-            else:
-                return Response({
-                    "success": False,
-                    "statusCode": status.HTTP_400_BAD_REQUEST,
-                    "message": "Invalid or expired OTP"
-                })
-                
-        except ObjectDoesNotExist:
-            return Response({
-                "success": False,
-                "statusCode": status.HTTP_404_NOT_FOUND,
-                "message": "User with this email not found"
-            })
-
-
-class ResetPasswordAPIView(generics.GenericAPIView):
-    """
-    POST: Reset password after OTP verification
-    """
-    serializer_class = ResetPasswordSerializer
-    permission_classes = [AllowAny]
-
-    def post(self, request):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        email = serializer.validated_data['email']
-        otp = serializer.validated_data['otp']
-        new_password = serializer.validated_data['new_password']
-        
-        try:
-            user = CustomHomeOwner.objects.get(email=email)
-            
-            # Check if OTP is valid and not expired
-            if (user.password_reset_otp == otp and 
-                user.password_reset_otp_expires and 
-                user.password_reset_otp_expires > timezone.now()):
-                
-                user.set_password(new_password)
-                user.password_reset_otp = None
-                user.password_reset_otp_expires = None
-                user.save()
-                
-                return Response({
-                    "success": True,
-                    "statusCode": status.HTTP_200_OK,
-                    "message": "Password reset successfully"
-                })
-            else:
-                return Response({
-                    "success": False,
-                    "statusCode": status.HTTP_400_BAD_REQUEST,
-                    "message": "Invalid or expired OTP"
-                })
-                
-        except ObjectDoesNotExist:
-            return Response({
-                "success": False,
-                "statusCode": status.HTTP_404_NOT_FOUND,
-                "message": "User with this email not found"
-            })
+            "data": home_owner_data,
+            "message": "Home Owner deleted successfully"
+        }, status=status.HTTP_200_OK)

@@ -5,7 +5,8 @@ from rest_framework import generics,status,filters
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import PageNumberPagination
-from django_filters.rest_framework import DjangoFilterBackend
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
 from .models import CustomDriver
 from .serializers import (
     DriverSerializer,
@@ -13,11 +14,25 @@ from .serializers import (
     DriverStatusUpdateSerializer,
     DriverUpdateSerializer
 )
+from utils.swagger_schema import (
+    SwaggerHelper,
+    get_serializer_schema,
+    create_success_response,
+    ValidationErrorResponse,
+    NotFoundResponse,
+    COMMON_RESPONSES,
+)
+
+
+swagger = SwaggerHelper(tag="Driver")
+
+
 class StandardResultsPagination(PageNumberPagination):
     page_size = 10
     page_size_query_param = "limit"
     max_page_size = 100
     page_query_param = "page"
+
 
 class DriverListAPIView(generics.ListAPIView):
     '''
@@ -27,12 +42,18 @@ class DriverListAPIView(generics.ListAPIView):
     serializer_class = DriverSerializer
     permission_classes = [IsAuthenticated]
     pagination_class = StandardResultsPagination
-    filter_backends = [filters.SearchFilter, filters.OrderingFilter, DjangoFilterBackend]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["name", "email", "phone_number"]
     ordering_fields = ["name", "email", "phone_number"]
     ordering = ["-date_joined"]
-    filterset_fields = ["is_active"]
 
+    @swagger_auto_schema(
+        **swagger.list_operation(
+            summary="List all drivers",
+            description="Retrieve a paginated list of all drivers with optional filtering by search query, ordering, and active status.",
+            serializer=DriverSerializer
+        )
+    )
     def get_paginated_response(self, data):
         return Response({
             "success": True,
@@ -66,6 +87,7 @@ class DriverListAPIView(generics.ListAPIView):
             }
         })
 
+
 class DriverCreateAPIView(generics.CreateAPIView):
     '''
     Post: Create a new driver
@@ -74,6 +96,13 @@ class DriverCreateAPIView(generics.CreateAPIView):
     serializer_class = DriverCreateSerializer
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        **swagger.create_operation(
+            summary="Create a new driver",
+            description="Register a new driver with personal information, vehicle details, and licensing information.",
+            serializer=DriverCreateSerializer
+        )
+    )
     def create(self, request, *args, **kwargs):
         try:
             serializer = self.get_serializer(data=request.data)
@@ -94,12 +123,20 @@ class DriverCreateAPIView(generics.CreateAPIView):
                 "message": str(e)
             }, status=status.HTTP_400_BAD_REQUEST)
 
+
 class DriverUpdateAPIView(generics.UpdateAPIView):
     queryset = CustomDriver.objects.all()
     serializer_class = DriverUpdateSerializer
     permission_classes = [IsAuthenticated]
     lookup_field = "id"
 
+    @swagger_auto_schema(
+        **swagger.update_operation(
+            summary="Update driver",
+            description="Update driver information such as name, phone, vehicle details, license information, etc.",
+            serializer=DriverUpdateSerializer
+        )
+    )
     def update(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid(raise_exception=True):
@@ -111,13 +148,28 @@ class DriverUpdateAPIView(generics.UpdateAPIView):
                 "message": "Driver updated successfully"
             }, status=status.HTTP_200_OK)
 
+
 class DriverStatusUpdateAPIView(generics.UpdateAPIView):
     queryset = CustomDriver.objects.all()
     serializer_class = DriverStatusUpdateSerializer
     permission_classes = [IsAuthenticated]
     lookup_field = "id"
-    http_method_names = ['patch'] 
+    http_method_names = ['patch']
 
+    @swagger_auto_schema(
+        operation_summary="[Driver] Update driver status",
+        operation_description="Update driver active status. Activating a driver allows them to receive delivery assignments. Deactivating temporarily suspends their ability to receive new assignments.",
+        tags=["Driver"],
+        request_body=DriverStatusUpdateSerializer,
+        responses={
+            200: create_success_response(
+                get_serializer_schema(DriverSerializer),
+                description="Driver status updated successfully"
+            ),
+            400: ValidationErrorResponse,
+            404: NotFoundResponse,
+        }
+    )
     def patch(self, request, *args, **kwargs):
         return self.partial_update(request, *args, **kwargs)
 
@@ -134,12 +186,19 @@ class DriverStatusUpdateAPIView(generics.UpdateAPIView):
             "message": "Driver status updated successfully"
         }, status=status.HTTP_200_OK)
 
+
 class DriverDeleteAPIView(generics.DestroyAPIView):
     queryset = CustomDriver.objects.all()
     serializer_class = DriverSerializer
     permission_classes = [IsAuthenticated]
     lookup_field = "id"
 
+    @swagger_auto_schema(
+        **swagger.delete_operation(
+            summary="Delete driver",
+            description="Remove a driver from the system. This action is permanent and cannot be undone."
+        )
+    )
     def destroy(self, request, *args, **kwargs):
         driver = self.get_object()
         driver_data = DriverSerializer(driver).data
@@ -151,12 +210,20 @@ class DriverDeleteAPIView(generics.DestroyAPIView):
             "message": "Driver deleted successfully"
         }, status=status.HTTP_200_OK)
 
+
 class DriverDetailAPIView(generics.RetrieveAPIView):
     queryset = CustomDriver.objects.all()
     serializer_class = DriverSerializer
     permission_classes = [IsAuthenticated]
     lookup_field = "id"
 
+    @swagger_auto_schema(
+        **swagger.retrieve_operation(
+            summary="Get driver details",
+            description="Retrieve detailed information about a specific driver including personal info, vehicle details, and current status.",
+            serializer=DriverSerializer
+        )
+    )
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
         serializer = self.get_serializer(instance)

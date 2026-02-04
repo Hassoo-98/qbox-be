@@ -50,7 +50,7 @@ MIDDLEWARE = [
 REST_FRAMEWORK={
     "DEFAULT_AUTHENTICATION_CLASSES":[
         "rest_framework_simplejwt.authentication.JWTAuthentication",
-        'rest_framework.authentication.SessionAuthentication',
+        # 'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',  
@@ -58,6 +58,41 @@ REST_FRAMEWORK={
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20
 }
+
+# Swagger/OpenAPI Settings
+SWAGGER_SETTINGS = {
+    'SECURITY_DEFINITIONS': {
+        'Bearer': {
+            'type': 'apiKey',
+            'name': 'Authorization',
+            'in': 'header',
+            'description': 'JWT Authorization header using the Bearer scheme. Example: "Authorization: Bearer {token}"'
+        }
+    },
+     "USE_SESSION_AUTH": False,
+    'DEFAULT_AUTO_SCHEMA_CLASS': 'drf_yasg.inspectors.SwaggerAutoSchema',
+    'DEFAULT_API_URL': '/',
+    'OPERATIONS_SORTER': 'method',
+    'TAGS_SORTER': 'alpha',
+    'APIS_SORTER': 'alpha',
+    'TITLE': 'Qbox API',
+    'DESCRIPTION': 'Qbox Backend API Documentation',
+    'VERSION': 'v1',
+    'SHOW_REQUEST_HEADERS': True,
+    'SUPPORTED_SUBMIT_METHODS': ['get', 'post', 'put', 'patch', 'delete'],
+    'VALIDATOR_URL': '',
+}
+
+REDOC_SETTINGS = {
+    'TITLE': 'Qbox API',
+    'DESCRIPTION': 'Qbox Backend API Documentation',
+    'VERSION': 'v1',
+    'SPEC_URL': '/swagger/schema/',
+    'DEFAULT_API_URL': '/',
+}
+
+# Schema URL for drf_yasg
+SCHEMA_URL = 'http://localhost:8000/'
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
