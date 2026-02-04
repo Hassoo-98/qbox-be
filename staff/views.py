@@ -18,9 +18,9 @@ from utils.swagger_schema import (
     ValidationErrorResponse,
     NotFoundResponse,
     COMMON_RESPONSES,
+    create_paginated_response,   
 )
 
-# Swagger Helper for Staff
 swagger = SwaggerHelper(tag="Staff")
 
 
@@ -31,10 +31,23 @@ class StandardResultsPagination(PageNumberPagination):
     page_query_param = "page"
 
 
+def get_wrapped_response_schema(inner_schema, description="Success response"):
+    return openapi.Schema(
+        type=openapi.TYPE_OBJECT,
+        properties={
+            "success": openapi.Schema(type=openapi.TYPE_BOOLEAN, default=True),
+            "statusCode": openapi.Schema(type=openapi.TYPE_INTEGER, example=200),
+            "message": openapi.Schema(type=openapi.TYPE_STRING),
+            "data": inner_schema,
+        },
+        description=description,
+    )
+
+
 class StaffListAPIView(generics.ListAPIView):
-    '''
-    Get: list all staff with pagination and filters
-    '''
+    """
+    GET: List all staff with pagination, search and ordering
+    """
     queryset = CustomStaff.objects.all()
     serializer_class = StaffSerializer
     permission_classes = [IsAuthenticated]
@@ -45,27 +58,31 @@ class StaffListAPIView(generics.ListAPIView):
     ordering = ["-date_joined"]
 
     @swagger_auto_schema(
-        **swagger.list_operation(
-            summary="List all staff",
-            description="Retrieve a paginated list of all staff members with optional filtering by search query, ordering, active status, and role.",
-            serializer=StaffSerializer
-        )
+        tags=["Staff"],
+        operation_summary="[Staff] List all staff (paginated)",
+        operation_description=(
+            "Retrieve a paginated list of staff members.\n\n"
+            "Supports:\n"
+            "- Search: name, email, phone_number\n"
+            "- Ordering: name, email, phone_number (prefix with - for descending)\n"
+            "- Pagination: ?page= &limit="
+        ),
+        manual_parameters=[
+            openapi.Parameter("page", openapi.IN_QUERY, type=openapi.TYPE_INTEGER, description="Page number", default=1),
+            openapi.Parameter("limit", openapi.IN_QUERY, type=openapi.TYPE_INTEGER, description="Items per page (max 100)", default=10),
+            openapi.Parameter("search", openapi.IN_QUERY, type=openapi.TYPE_STRING, description="Search term"),
+            openapi.Parameter("ordering", openapi.IN_QUERY, type=openapi.TYPE_STRING, description="Ordering field(s), e.g. name,-email"),
+        ],
+        responses={
+            200: create_paginated_response(  # ← use your helper if it exists, or get_wrapped_response_schema(...)
+                get_serializer_schema(StaffSerializer, many=True),
+                tag="Staff items"
+            ),
+            401: "Unauthorized",
+            **COMMON_RESPONSES,
+        }
     )
-    def get_paginated_response(self, data):
-        return Response({
-            "success": True,
-            "statusCode": status.HTTP_200_OK,
-            "data": {
-                "items": data,
-                "total": self.paginator.page.paginator.count,
-                "page": self.paginator.page.number,
-                "limit": self.paginator.page_size,
-                "hasMore": self.paginator.page.has_next(),
-            },
-            "message": "List Staff"
-        })
-
-    def list(self, request, *args, **kwargs):
+    def get(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(queryset)
         if page is not None:
@@ -81,63 +98,80 @@ class StaffListAPIView(generics.ListAPIView):
                 "page": 1,
                 "limit": queryset.count() if queryset.count() < self.pagination_class.page_size else self.pagination_class.page_size,
                 "hasMore": False
-            }
+            },
+            "message": "List Staff"
+        })
+
+    def get_paginated_response(self, data):
+        # No decorator needed here anymore
+        return Response({
+            "success": True,
+            "statusCode": status.HTTP_200_OK,
+            "data": {
+                "items": data,
+                "total": self.paginator.page.paginator.count,
+                "page": self.paginator.page.number,
+                "limit": self.paginator.page_size,
+                "hasMore": self.paginator.page.has_next(),
+            },
+            "message": "List Staff"
         })
 
 
 class StaffCreateAPIView(generics.CreateAPIView):
-    '''
-    Post: Create a new staff member
-    '''
     queryset = CustomStaff.objects.all()
     serializer_class = StaffCreateSerializer
     permission_classes = [IsAuthenticated]
 
     @swagger_auto_schema(
-        **swagger.create_operation(
-            summary="Create a new staff member",
-            description="Register a new staff member with personal information and role assignment.",
-            serializer=StaffCreateSerializer
-        )
+        tags=["Staff"],
+        operation_summary="[Staff] Create a new staff member",
+        operation_description="Register a new staff member with personal information and role assignment.",
+        responses={
+            201: get_wrapped_response_schema(
+                get_serializer_schema(StaffSerializer),
+                "Staff created successfully"
+            ),
+            400: ValidationErrorResponse,
+            401: "Unauthorized",
+            **COMMON_RESPONSES,
+        }
     )
-    def create(self, request, *args, **kwargs):
-        try:
-            serializer = self.get_serializer(data=request.data)
-            if serializer.is_valid(raise_exception=True):
-                staff = serializer.save()
-                staff_data = StaffSerializer(staff).data
-                return Response({
-                    "success": True,
-                    "statusCode": status.HTTP_201_CREATED,
-                    "data": staff_data,
-                    "message": "Staff created successfully"
-                }, status=status.HTTP_201_CREATED)
-        except Exception as e:
-            return Response({
-                "success": False,
-                "statusCode": status.HTTP_400_BAD_REQUEST,
-                "data": None,
-                "message": str(e)
-            }, status=status.HTTP_400_BAD_REQUEST)
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        staff = serializer.save()
+        staff_data = StaffSerializer(staff).data
+        return Response({
+            "success": True,
+            "statusCode": status.HTTP_201_CREATED,
+            "data": staff_data,
+            "message": "Staff created successfully"
+        }, status=status.HTTP_201_CREATED)
+
+
 
 
 class StaffDetailAPIView(generics.RetrieveAPIView):
-    '''
-    Get: Retrieve a single staff member
-    '''
     queryset = CustomStaff.objects.all()
     serializer_class = StaffSerializer
     permission_classes = [IsAuthenticated]
     lookup_field = "id"
 
     @swagger_auto_schema(
-        **swagger.retrieve_operation(
-            summary="Get staff details",
-            description="Retrieve detailed information about a specific staff member including personal info, role, and current status.",
-            serializer=StaffSerializer
-        )
+        tags=["Staff"],
+        operation_summary="[Staff] Get staff details",
+        operation_description="Retrieve detailed information about a specific staff member.",
+        responses={
+            200: get_wrapped_response_schema(
+                get_serializer_schema(StaffSerializer),
+                "Staff details retrieved"
+            ),
+            404: NotFoundResponse,
+            401: "Unauthorized",
+        }
     )
-    def retrieve(self, request, *args, **kwargs):
+    def get(self, request, *args, **kwargs):
         instance = self.get_object()
         serializer = self.get_serializer(instance)
         return Response({
@@ -145,26 +179,30 @@ class StaffDetailAPIView(generics.RetrieveAPIView):
             "statusCode": status.HTTP_200_OK,
             "data": serializer.data,
             "message": "Get Staff"
-        }, status=status.HTTP_200_OK)
+        })
 
 
 class StaffUpdateAPIView(generics.UpdateAPIView):
-    '''
-    Put: Update a staff member
-    '''
     queryset = CustomStaff.objects.all()
     serializer_class = StaffSerializer
     permission_classes = [IsAuthenticated]
     lookup_field = "id"
 
     @swagger_auto_schema(
-        **swagger.update_operation(
-            summary="Update staff",
-            description="Update staff information such as name, phone, role, or active status.",
-            serializer=StaffSerializer
-        )
+        tags=["Staff"],
+        operation_summary="[Staff] Update staff information",
+        operation_description="Update name, phone, role, active status, etc. Use PATCH for partial updates.",
+        responses={
+            200: get_wrapped_response_schema(
+                get_serializer_schema(StaffSerializer),
+                "Staff updated successfully"
+            ),
+            400: ValidationErrorResponse,
+            404: NotFoundResponse,
+            401: "Unauthorized",
+        }
     )
-    def update(self, request, *args, **kwargs):
+    def patch(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
@@ -175,13 +213,10 @@ class StaffUpdateAPIView(generics.UpdateAPIView):
             "statusCode": status.HTTP_200_OK,
             "data": serializer.data,
             "message": "Staff updated successfully"
-        }, status=status.HTTP_200_OK)
+        })
 
 
 class StaffStatusUpdateAPIView(generics.UpdateAPIView):
-    '''
-    Patch: Update staff active status
-    '''
     queryset = CustomStaff.objects.all()
     serializer_class = StaffStatusUpdateSerializer
     permission_classes = [IsAuthenticated]
@@ -189,26 +224,22 @@ class StaffStatusUpdateAPIView(generics.UpdateAPIView):
     http_method_names = ['patch']
 
     @swagger_auto_schema(
-        operation_summary="[Staff] Update staff status",
-        operation_description="Update staff active status. Activating a staff member enables their account access. Deactivating temporarily suspends their access.",
         tags=["Staff"],
-        request_body=StaffStatusUpdateSerializer,
+        operation_summary="[Staff] Update staff active status",
+        operation_description="Activate or deactivate a staff member (is_active field).",
         responses={
-            200: create_success_response(
+            200: get_wrapped_response_schema(
                 get_serializer_schema(StaffSerializer),
-                description="Staff status updated successfully"
+                "Staff status updated successfully"
             ),
             400: ValidationErrorResponse,
             404: NotFoundResponse,
+            401: "Unauthorized",
         }
     )
     def patch(self, request, *args, **kwargs):
-        return self.partial_update(request, *args, **kwargs)
-
-    def partial_update(self, request, *args, **kwargs):
-        partial = True
         instance = self.get_object()
-        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
         return Response({
@@ -216,25 +247,29 @@ class StaffStatusUpdateAPIView(generics.UpdateAPIView):
             "statusCode": status.HTTP_200_OK,
             "data": StaffSerializer(serializer.instance).data,
             "message": "Staff status updated successfully"
-        }, status=status.HTTP_200_OK)
+        })
 
 
 class StaffDeleteAPIView(generics.DestroyAPIView):
-    '''
-    Delete: Remove a staff member
-    '''
     queryset = CustomStaff.objects.all()
     serializer_class = StaffSerializer
     permission_classes = [IsAuthenticated]
     lookup_field = "id"
 
     @swagger_auto_schema(
-        **swagger.delete_operation(
-            summary="Delete staff",
-            description="Remove a staff member from the system. This action is permanent and cannot be undone."
-        )
+        tags=["Staff"],
+        operation_summary="[Staff] Delete a staff member",
+        operation_description="Permanently remove a staff member. Returns data of the deleted record.",
+        responses={
+            200: get_wrapped_response_schema(
+                get_serializer_schema(StaffSerializer),
+                "Staff deleted successfully"
+            ),
+            404: NotFoundResponse,
+            401: "Unauthorized",
+        }
     )
-    def destroy(self, request, *args, **kwargs):
+    def delete(self, request, *args, **kwargs):
         staff = self.get_object()
         staff_data = StaffSerializer(staff).data
         staff.delete()
@@ -243,4 +278,4 @@ class StaffDeleteAPIView(generics.DestroyAPIView):
             "statusCode": status.HTTP_200_OK,
             "data": staff_data,
             "message": "Staff deleted successfully"
-        }, status=status.HTTP_200_OK)
+        })

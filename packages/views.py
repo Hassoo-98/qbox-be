@@ -65,7 +65,7 @@ class PackageListAPIView(generics.ListAPIView):
             "message": "List Packages"
         })
 
-    def list(self, request, *args, **kwargs):
+    def get(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(queryset)
         if page is not None:
@@ -100,7 +100,7 @@ class PackageCreateAPIView(generics.CreateAPIView):
             serializer=PackageCreateSerializer
         )
     )
-    def create(self, request, *args, **kwargs):
+    def get(self, request, *args, **kwargs):
         try:
             serializer = self.get_serializer(data=request.data)
             if serializer.is_valid(raise_exception=True):
@@ -137,7 +137,7 @@ class PackageDetailAPIView(generics.RetrieveAPIView):
             serializer=PackageSerializer
         )
     )
-    def retrieve(self, request, *args, **kwargs):
+    def get(self, request, *args, **kwargs):
         instance = self.get_object()
         serializer = self.get_serializer(instance)
         return Response({
@@ -164,7 +164,7 @@ class PackageUpdateAPIView(generics.UpdateAPIView):
             serializer=PackageSerializer
         )
     )
-    def update(self, request, *args, **kwargs):
+    def patch(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
@@ -192,7 +192,6 @@ class PackageStatusUpdateAPIView(generics.UpdateAPIView):
         operation_summary="[Package] Update package status",
         operation_description="Update package active status. Activating a package makes it available for subscription. Deactivating hides it from the subscription options.",
         tags=["Package"],
-        request_body=PackageStatusUpdateSerializer,
         responses={
             200: create_success_response(
                 get_serializer_schema(PackageSerializer),
@@ -234,7 +233,7 @@ class PackageDeleteAPIView(generics.DestroyAPIView):
             description="Remove a package from the system. This action is permanent and cannot be undone."
         )
     )
-    def destroy(self, request, *args, **kwargs):
+    def delete(self, request, *args, **kwargs):
         package = self.get_object()
         package_data = PackageSerializer(package).data
         package.delete()

@@ -47,7 +47,8 @@ class QboxListAPIView(generics.ListAPIView):
         **swagger.list_operation(
             summary="List all QBoxes",
             description="Retrieve a paginated list of all QBoxes with optional filtering by search query, ordering, active status, and current status.",
-            serializer=QboxSerializer
+            serializer=QboxSerializer,
+             tags=["QBox"]
         )
     )
     def get_paginated_response(self, data):
@@ -64,7 +65,7 @@ class QboxListAPIView(generics.ListAPIView):
             "message": "List QBoxes"
         })
 
-    def list(self, request, *args, **kwargs):
+    def get(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(queryset)
         if page is not None:
@@ -99,7 +100,7 @@ class QboxCreateAPIView(generics.CreateAPIView):
             serializer=QboxCreateSerializer
         )
     )
-    def create(self, request, *args, **kwargs):
+    def post(self, request, *args, **kwargs):
         try:
             serializer = self.get_serializer(data=request.data)
             if serializer.is_valid(raise_exception=True):
@@ -136,7 +137,7 @@ class QboxDetailAPIView(generics.RetrieveAPIView):
             serializer=QboxSerializer
         )
     )
-    def retrieve(self, request, *args, **kwargs):
+    def get(self, request, *args, **kwargs):
         instance = self.get_object()
         serializer = self.get_serializer(instance)
         return Response({
@@ -163,7 +164,7 @@ class QboxUpdateAPIView(generics.UpdateAPIView):
             serializer=QboxSerializer
         )
     )
-    def update(self, request, *args, **kwargs):
+    def patch(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
@@ -191,7 +192,6 @@ class QboxStatusUpdateAPIView(generics.UpdateAPIView):
         operation_summary="[QBox] Update QBox status",
         operation_description="Update QBox status and active state. This controls whether the QBox can receive deliveries.",
         tags=["QBox"],
-        request_body=QboxStatusUpdateSerializer,
         responses={
             200: create_success_response(
                 get_serializer_schema(QboxSerializer),
@@ -202,9 +202,9 @@ class QboxStatusUpdateAPIView(generics.UpdateAPIView):
         }
     )
     def patch(self, request, *args, **kwargs):
-        return self.partial_update(request, *args, **kwargs)
+        return self.update(request, *args, **kwargs)
 
-    def partial_update(self, request, *args, **kwargs):
+    def patch(self, request, *args, **kwargs):
         partial = True
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
@@ -233,7 +233,7 @@ class QboxDeleteAPIView(generics.DestroyAPIView):
             description="Remove a QBox from the system. This action is permanent and cannot be undone."
         )
     )
-    def destroy(self, request, *args, **kwargs):
+    def delete(self, request, *args, **kwargs):
         qbox = self.get_object()
         qbox_data = QboxSerializer(qbox).data
         qbox.delete()

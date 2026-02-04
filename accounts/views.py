@@ -52,15 +52,12 @@ class RegisterView(generics.CreateAPIView):
             serializer=RegisterSerializer
         )
     )
-    def create(self, request, *args, **kwargs):
+    def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid(raise_exception=True):
             user = serializer.save()
-            # Generate verification token
             token = default_token_generator.make_token(user)
             uidb64 = urlsafe_base64_encode(force_bytes(user.pk))
-            
-            # Send verification email
             subject = 'Verify your email'
             message = render_to_string('verification_email.html', {
                 'user': user,
@@ -100,7 +97,7 @@ class LoginView(generics.CreateAPIView):
             serializer=LoginSerializer
         )
     )
-    def create(self, request, *args, **kwargs):
+    def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid(raise_exception=True):
             user = serializer.validated_data['user']
@@ -172,10 +169,11 @@ class ChangePasswordView(generics.UpdateAPIView):
         **swagger.update_operation(
             summary="Change password",
             description="Change the password of the currently authenticated user. Requires current password for verification.",
-            serializer=ChangePasswordSerializer
+            serializer=ChangePasswordSerializer,
+            
         )
     )
-    def update(self, request, *args, **kwargs):
+    def put(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
@@ -201,7 +199,7 @@ class PasswordResetRequestView(generics.CreateAPIView):
             serializer=PasswordResetRequestSerializer
         )
     )
-    def create(self, request, *args, **kwargs):
+    def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         email = serializer.validated_data['email']
@@ -217,7 +215,7 @@ class PasswordResetRequestView(generics.CreateAPIView):
             })
             send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [user.email])
         except CustomUser.DoesNotExist:
-            pass  # Don't reveal if user exists
+            pass  
         return Response({
             "success": True,
             "statusCode": status.HTTP_200_OK,
@@ -240,7 +238,7 @@ class PasswordResetConfirmView(generics.CreateAPIView):
             serializer=PasswordResetConfirmSerializer
         )
     )
-    def create(self, request, *args, **kwargs):
+    def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
@@ -250,7 +248,6 @@ class PasswordResetConfirmView(generics.CreateAPIView):
             "data": None,
             "message": "Password has been reset successfully"
         }, status=status.HTTP_200_OK)
-
 
 class UserViewSet(viewsets.ModelViewSet):
     """
@@ -275,7 +272,7 @@ class UserViewSet(viewsets.ModelViewSet):
         **swagger.list_operation(
             summary="List all users",
             description="Retrieve a list of all users (admin only). Regular users can only see their own profile.",
-            serializer=UserSerializer
+            serializer=UserSerializer(many=True)
         )
     )
     def list(self, request, *args, **kwargs):
@@ -308,8 +305,8 @@ class UserViewSet(viewsets.ModelViewSet):
             serializer=UserSerializer
         )
     )
-    def update(self, request, *args, **kwargs):
-        return super().update(request, *args, **kwargs)
+    def partial_update(self, request, *args, **kwargs):
+        return super().partial_update(request, *args, **kwargs)
 
     @swagger_auto_schema(
         **swagger.delete_operation(
@@ -395,7 +392,7 @@ class OTPVerificationView(generics.CreateAPIView):
             serializer=OTPSerializer
         )
     )
-    def create(self, request, *args, **kwargs):
+    def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         return Response({

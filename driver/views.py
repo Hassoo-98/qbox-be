@@ -51,7 +51,8 @@ class DriverListAPIView(generics.ListAPIView):
         **swagger.list_operation(
             summary="List all drivers",
             description="Retrieve a paginated list of all drivers with optional filtering by search query, ordering, and active status.",
-            serializer=DriverSerializer
+            serializer=DriverSerializer,
+            tags=["Driver"]
         )
     )
     def get_paginated_response(self, data):
@@ -68,7 +69,7 @@ class DriverListAPIView(generics.ListAPIView):
             "message": "List Drivers"
         })
 
-    def list(self, request, *args, **kwargs):
+    def get(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(queryset)
         if page is not None:
@@ -100,10 +101,11 @@ class DriverCreateAPIView(generics.CreateAPIView):
         **swagger.create_operation(
             summary="Create a new driver",
             description="Register a new driver with personal information, vehicle details, and licensing information.",
-            serializer=DriverCreateSerializer
+            serializer=DriverCreateSerializer,
+             tags=["Driver"]
         )
     )
-    def create(self, request, *args, **kwargs):
+    def post(self, request, *args, **kwargs):
         try:
             serializer = self.get_serializer(data=request.data)
             if serializer.is_valid(raise_exception=True):
@@ -134,10 +136,11 @@ class DriverUpdateAPIView(generics.UpdateAPIView):
         **swagger.update_operation(
             summary="Update driver",
             description="Update driver information such as name, phone, vehicle details, license information, etc.",
-            serializer=DriverUpdateSerializer
+            serializer=DriverUpdateSerializer,
+            tags=["Driver"]
         )
     )
-    def update(self, request, *args, **kwargs):
+    def patch(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid(raise_exception=True):
             serializer.save()
@@ -160,7 +163,6 @@ class DriverStatusUpdateAPIView(generics.UpdateAPIView):
         operation_summary="[Driver] Update driver status",
         operation_description="Update driver active status. Activating a driver allows them to receive delivery assignments. Deactivating temporarily suspends their ability to receive new assignments.",
         tags=["Driver"],
-        request_body=DriverStatusUpdateSerializer,
         responses={
             200: create_success_response(
                 get_serializer_schema(DriverSerializer),
@@ -171,9 +173,9 @@ class DriverStatusUpdateAPIView(generics.UpdateAPIView):
         }
     )
     def patch(self, request, *args, **kwargs):
-        return self.partial_update(request, *args, **kwargs)
+        return self.patch(request, *args, **kwargs)
 
-    def partial_update(self, request, *args, **kwargs):
+    def patch(self, request, *args, **kwargs):
         partial = True
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
@@ -196,10 +198,11 @@ class DriverDeleteAPIView(generics.DestroyAPIView):
     @swagger_auto_schema(
         **swagger.delete_operation(
             summary="Delete driver",
-            description="Remove a driver from the system. This action is permanent and cannot be undone."
+            description="Remove a driver from the system. This action is permanent and cannot be undone.",
+             tags=["Driver"]
         )
     )
-    def destroy(self, request, *args, **kwargs):
+    def delete(self, request, *args, **kwargs):
         driver = self.get_object()
         driver_data = DriverSerializer(driver).data
         driver.delete()
@@ -221,10 +224,11 @@ class DriverDetailAPIView(generics.RetrieveAPIView):
         **swagger.retrieve_operation(
             summary="Get driver details",
             description="Retrieve detailed information about a specific driver including personal info, vehicle details, and current status.",
-            serializer=DriverSerializer
+            serializer=DriverSerializer,
+             tags=["Driver"]
         )
     )
-    def retrieve(self, request, *args, **kwargs):
+    def get(self, request, *args, **kwargs):
         instance = self.get_object()
         serializer = self.get_serializer(instance)
         return Response({
