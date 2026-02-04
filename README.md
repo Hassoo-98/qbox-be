@@ -30,7 +30,6 @@ This project provides REST APIs, JWT authentication, and Swagger documentation f
 - JWT / token-based authentication  
 - PostgreSQL database integration  
 - Isolated virtual environment setup  
-- Optional Docker setup for easy deployment  
 - Example CRUD endpoints for `driver` and other models  
 
 ---
