@@ -33,6 +33,8 @@ INSTALLED_APPS = [
     "home_owner",
     "q_box",
     "packages",
+    "service_provider",
+    "locations",
     'drf_yasg'
 ]
 AUTH_USER_MODEL = 'accounts.CustomUser'
