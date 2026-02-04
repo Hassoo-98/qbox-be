@@ -18,7 +18,7 @@ Secure JWT authentication • Comprehensive Swagger documentation • Clean CRUD
 - JWT authentication (Simple JWT)
 - Interactive API documentation via **Swagger UI** + **Redoc**
 - PostgreSQL database with proper migrations
-- Environment variable configuration (.env)
+- Environment variable configuration (`.env`)
 - Example CRUD operations (Driver model & more)
 - Production deployment hints (Gunicorn + Nginx)
 - Modern project structure & best practices
@@ -28,16 +28,16 @@ Secure JWT authentication • Comprehensive Swagger documentation • Clean CRUD
 
 ## 🛠 Tech Stack
 
-| Category            | Technology                        | Version    |
-|---------------------|-----------------------------------|------------|
-| Language            | Python                            | 3.11+      |
-| Web Framework       | Django                            | 6.x        |
-| API Framework       | Django REST Framework             | latest     |
-| Authentication      | djangorestframework-simplejwt     | latest     |
-| API Documentation   | drf-yasg (Swagger + Redoc)        | latest     |
-| Database            | PostgreSQL                        | 14+        |
-| Production Server   | Gunicorn + Nginx                  | —          |
-| Dependency Management | pip / requirements.txt          | —          |
+| Category              | Technology                        | Version    |
+|-----------------------|-----------------------------------|------------|
+| Language              | Python                            | 3.11+      |
+| Web Framework         | Django                            | 6.x        |
+| API Framework         | Django REST Framework             | latest     |
+| Authentication        | djangorestframework-simplejwt     | latest     |
+| API Documentation     | drf-yasg (Swagger + Redoc)        | latest     |
+| Database              | PostgreSQL                        | 14+        |
+| Production Server     | Gunicorn + Nginx                  | —          |
+| Dependency Management | pip / requirements.txt            | —          |
 
 ---
 
@@ -54,82 +54,37 @@ Secure JWT authentication • Comprehensive Swagger documentation • Clean CRUD
 ## 🚀 Quick Start
 
 ```bash
-# 1. Clone repository
+# 1. Clone the repository
 git clone https://github.com/Hegmon/Qbox-backend.git
 cd Qbox-backend
 
-# 2. Create & activate virtual environment
-# Linux/macOS
+# 2. Create and activate virtual environment
+
+# Linux / macOS
 python3 -m venv venv
 source venv/bin/activate
 
-# Windows (cmd)
+# Windows (Command Prompt)
 python -m venv venv
 venv\Scripts\activate.bat
 
 # Windows (PowerShell)
 .\venv\Scripts\Activate.ps1
 
-# 3. Install dependencies
+# 3. Upgrade pip and install dependencies
 pip install --upgrade pip
 pip install -r requirements.txt
 
-# 4. Create .env file (example below)
-cp .env.example .env    # if you have .env.example
-# or manually create .env and fill values
+# 4. Create .env file from example (if exists) or manually
+#    (see Environment Variables section below)
+cp .env.example .env    # only if you have .env.example
 
-# 5. Run migrations
+# 5. Apply database migrations
 python manage.py makemigrations
 python manage.py migrate
 
-# 6. (optional) Create superuser
+# 6. (Optional) Create a superuser
 python manage.py createsuperuser
 
-# 7. Start development server
+# 7. Start the development server
 python manage.py runserver
-Open: http://127.0.0.1:8000/
-API Documentation:
-→ http://127.0.0.1:8000/swagger/
-→ http://127.0.0.1:8000/redoc/
-
-⚙️ Environment Variables (.env)
-env# === Django ===
-SECRET_KEY=your-very-long-random-secure-key-here
-DEBUG=True               # change to False in production!
-ALLOWED_HOSTS=localhost,127.0.0.1
-
-# === Database (PostgreSQL) ===
-DB_NAME=qbox_db
-DB_USER=postgres
-DB_PASSWORD=your_password
-DB_HOST=localhost
-DB_PORT=5432
-
-# === JWT settings (optional customization) ===
-ACCESS_TOKEN_LIFETIME_MINUTES=60
-REFRESH_TOKEN_LIFETIME_DAYS=7
-Tip: Never commit .env to git — add it to .gitignore
-
-🗄 Database Setup
-Bash# Create database (one-time)
-createdb -U postgres qbox_db
-# or use pgAdmin / other client
-
-# Apply migrations
-python manage.py makemigrations
-python manage.py migrate
-
-📚 API Documentation
-Automatically generated:
-
-Interactive Swagger UI → /swagger/
-Clean Redoc view → /redoc/
-
-Authentication method: Bearer Token (JWT)
-Example:
-textAuthorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-
-🧪 Running Tests
-Bashpython manage.py test
-# or more detailed output:
-python manage.py test --verbosity=2
