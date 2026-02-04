@@ -63,3 +63,29 @@ Make sure the following are installed:
 ```bash
 git clone https://github.com/Hegmon/Qbox-backend/
 cd Qbox-backend
+
+
+Create and activate a virtual environment:
+# Linux / Mac
+python3 -m venv venv
+source venv/bin/activate
+
+# Windows (Command Prompt)
+python -m venv venv
+venv\Scripts\activate
+
+# Windows (PowerShell)
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+
+
+Upgrade pip (optional but recommended):
+pip install --upgrade pip
+
+Install all required packages:
+pip install -r requirements.txt
+
+Verify installation:
+python -m django --version
+python -m pip list
+
