@@ -21,6 +21,19 @@ from drf_yasg import openapi
 
 from .serializers import RegisterSerializer, CustomTokenObtainPairSerializer
 from .models import CustomUser
+from utils.swagger_schema import (
+    SwaggerHelper,
+    create_success_response,
+    ValidationErrorResponse,
+    NotFoundResponse,
+    ServerErrorResponse,
+    EMAIL_REQUEST,
+    OTP_VERIFY_REQUEST,
+    LOGIN_REQUEST,
+    PASSWORD_RESET_REQUEST,
+    PASSWORD_RESET_CONFIRM_REQUEST,
+)
+
 logger = logging.getLogger(__name__)
 JWT_SECRET_KEY = settings.SECRET_KEY
 JWT_ALGORITHM = 'HS256'
@@ -225,7 +238,7 @@ class VerifyEmailSendOTPView(APIView):
                 "success": False,
                 "statusCode": 500,
                 "message": f"Failed to send OTP email: {error_details}",
-                "debug_otp": otp   # only for development/testing
+                "debug_otp": otp
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -288,7 +301,7 @@ class VerifyEmailVerifyOTPView(APIView):
 
         user.email_verified = True
         user.is_active = True
-        user.verification_token = ""  
+        user.verification_token = ""
         user.save(update_fields=['email_verified', 'is_active', 'verification_token'])
 
         logger.info(f"Email verified successfully for {user.email}")
@@ -408,34 +421,34 @@ class LoginView(APIView):
     def post(self, request):
         email = request.data.get('email')
         password = request.data.get('password')
-        
+
         if not email or not password:
             return Response({
                 "success": False,
                 "statusCode": 400,
                 "message": "Email and password are required"
             }, status=status.HTTP_400_BAD_REQUEST)
-        
+
         user = authenticate(request, username=email, password=password)
-        
+
         if user is None:
             return Response({
                 "success": False,
                 "statusCode": 401,
                 "message": "Invalid email or password"
             }, status=status.HTTP_401_UNAUTHORIZED)
-        
+
         if not user.email_verified:
             return Response({
                 "success": False,
                 "statusCode": 403,
                 "message": "Email is not verified. Please verify your email to proceed."
             }, status=status.HTTP_403_FORBIDDEN)
-        
+
         # Generate simplejwt tokens
         refresh = RefreshToken.for_user(user)
         access_token = str(refresh.access_token)
-        
+
         return Response({
             "success": True,
             "statusCode": 200,
@@ -453,6 +466,7 @@ class LoginView(APIView):
             "refresh": str(refresh),
             "createdAt": datetime.utcnow().isoformat()
         }, status=status.HTTP_200_OK)
+
 
 class Forget_PasswordView(APIView):
     """Send OTP to user's email for password reset."""
@@ -503,10 +517,12 @@ class Forget_PasswordView(APIView):
                 "statusCode": 404,
                 "message": "User with this email does not exist"
             }, status=status.HTTP_404_NOT_FOUND)
+
         otp = generate_otp()
         logger.info(f"Generated reset OTP for {email}: {otp}")
         user.reset_password_token = otp
         user.save(update_fields=['reset_password_token'])
+
         subject = "Password Reset OTP - Qbox"
         html_content = f"""
         <html>
@@ -524,6 +540,7 @@ class Forget_PasswordView(APIView):
         """
 
         text_content = strip_tags(html_content)
+
         try:
             email_message = EmailMultiAlternatives(
                 subject=subject,
@@ -556,9 +573,9 @@ class Forget_PasswordView(APIView):
                 "success": False,
                 "statusCode": 500,
                 "message": f"Failed to send password reset OTP: {error_details}",
-                "debug_otp": otp  
+                "debug_otp": otp
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
+
 
 class ResetPasswordConfirmView(APIView):
     """Verify OTP and set new password."""
@@ -616,12 +633,14 @@ class ResetPasswordConfirmView(APIView):
                 "statusCode": 404,
                 "message": "User with this email does not exist"
             }, status=status.HTTP_404_NOT_FOUND)
+
         if user.reset_password_token != otp:
             return Response({
                 "success": False,
                 "statusCode": 400,
                 "message": "Invalid or expired OTP"
             }, status=status.HTTP_400_BAD_REQUEST)
+
         try:
             user.set_password(new_password)
             user.reset_password_token = ""
