@@ -91,6 +91,9 @@ REDOC_SETTINGS = {
     'DEFAULT_API_URL': '/',
 }
 
+# Schema URL for drf_yasg
+SCHEMA_URL = 'http://localhost:8000/'
+
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),

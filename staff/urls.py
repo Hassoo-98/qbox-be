@@ -2,7 +2,7 @@ from django.urls import path
 from .views import (
     StaffListAPIView,
     StaffCreateAPIView,
-    StaffChangeStatusAPIView,
+    StaffStatusUpdateAPIView,
     StaffUpdateAPIView,
     StaffDeleteAPIView,
     StaffDetailAPIView
@@ -14,5 +14,5 @@ urlpatterns = [
     path("/<int:id>", StaffDetailAPIView.as_view(), name="staff-detail"),
     path("/<int:id>/update", StaffUpdateAPIView.as_view(), name="staff-update"),
     path("/<int:id>/delete", StaffDeleteAPIView.as_view(), name="staff-delete"),
-    path("/<int:id>/change-status", StaffChangeStatusAPIView.as_view(), name="staff-change-status"),
+    path("/<int:id>/change-status", StaffStatusUpdateAPIView.as_view(), name="staff-change-status"),
 ]

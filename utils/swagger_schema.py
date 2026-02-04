@@ -3,14 +3,112 @@ Reusable Swagger schema utilities for DRF-YASG.
 Import this module in your views to simplify swagger documentation.
 """
 from drf_yasg import openapi
-from drf_yasg.utils import swagger_auto_schema
-from functools import wraps
+from rest_framework import serializers
+
+
+def get_serializer_schema(serializer_class, many=False):
+    """
+    Convert a DRF serializer class to an OpenAPI schema.
+    This allows using serializers directly in swagger documentation.
+    """
+    if serializer_class is None:
+        return openapi.Schema(type=openapi.TYPE_OBJECT)
+    
+    # Create an instance to get fields
+    if many:
+        serializer = serializer_class(many=True)
+    else:
+        serializer = serializer_class()
+    
+    properties = {}
+    required_fields = []
+    
+    for field_name, field in serializer.fields.items():
+        # Determine field type
+        field_type = None
+        format_str = None
+        
+        if isinstance(field, serializers.CharField):
+            field_type = openapi.TYPE_STRING
+            format_str = 'string'
+        elif isinstance(field, serializers.IntegerField):
+            field_type = openapi.TYPE_INTEGER
+            format_str = 'integer'
+        elif isinstance(field, serializers.BooleanField):
+            field_type = openapi.TYPE_BOOLEAN
+        elif isinstance(field, serializers.EmailField):
+            field_type = openapi.TYPE_STRING
+            format_str = 'email'
+        elif isinstance(field, serializers.URLField):
+            field_type = openapi.TYPE_STRING
+            format_str = 'uri'
+        elif isinstance(field, serializers.DateTimeField):
+            field_type = openapi.TYPE_STRING
+            format_str = 'date-time'
+        elif isinstance(field, serializers.DateField):
+            field_type = openapi.TYPE_STRING
+            format_str = 'date'
+        elif isinstance(field, serializers.DecimalField):
+            field_type = openapi.TYPE_NUMBER
+            format_str = 'decimal'
+        elif isinstance(field, serializers.FloatField):
+            field_type = openapi.TYPE_NUMBER
+            format_str = 'float'
+        elif isinstance(field, serializers.ListField):
+            field_type = openapi.TYPE_ARRAY
+        elif isinstance(field, serializers.DictField):
+            field_type = openapi.TYPE_OBJECT
+        elif isinstance(field, serializers.JSONField):
+            field_type = openapi.TYPE_OBJECT
+        else:
+            field_type = openapi.TYPE_STRING
+        
+        # Create schema for the field
+        field_schema = openapi.Schema(type=field_type)
+        
+        if format_str:
+            field_schema.format = format_str
+        
+        # Add description if available
+        if hasattr(field, 'help_text') and field.help_text:
+            field_schema.description = field.help_text
+        
+        # Add default value
+        if hasattr(field, 'default') and field.default != serializers.empty:
+            field_schema.default = field.default
+        
+        # Add min/max for numeric fields
+        if hasattr(field, 'min_value') and field.min_value is not None:
+            field_schema.minimum = field.min_value
+        if hasattr(field, 'max_value') and field.max_value is not None:
+            field_schema.maximum = field.max_value
+        
+        # Add min/max length for string fields
+        if hasattr(field, 'min_length') and field.min_length is not None:
+            field_schema.minLength = field.min_length
+        if hasattr(field, 'max_length') and field.max_length is not None:
+            field_schema.maxLength = field.max_length
+        
+        properties[field_name] = field_schema
+        
+        if field.required:
+            required_fields.append(field_name)
+    
+    schema = openapi.Schema(
+        type=openapi.TYPE_OBJECT,
+        properties=properties
+    )
+    
+    if required_fields:
+        schema.required = required_fields
+    
+    return schema
 
 
 # ============== Common Schema Types ==============
 SuccessBoolean = openapi.Schema(type=openapi.TYPE_BOOLEAN, default=True)
 StatusCode = openapi.Schema(type=openapi.TYPE_INTEGER, example=200)
-MessageField = openapi.Schema(type=openapi.TYPE_STRING)
+MessageField = openapi.Schema(type=openapi.TYPE_STRING, example="Operation successful")
 EmptyDataField = openapi.Schema(type=openapi.TYPE_OBJECT, additional_properties={})
 
 
@@ -122,84 +220,6 @@ ServerErrorResponse = openapi.Response(
 )
 
 
-# ============== Common HTTP Methods ==============
-
-def create_string_field(description="", required=False, example="sample"):
-    return openapi.Schema(
-        type=openapi.TYPE_STRING,
-        description=description,
-        example=example,
-    )
-
-
-def create_email_field(description="Email address", required=True):
-    return openapi.Schema(
-        type=openapi.TYPE_STRING,
-        format='email',
-        description=description,
-        example='user@example.com',
-    )
-
-
-def create_password_field(description="Password", required=True):
-    return openapi.Schema(
-        type=openapi.TYPE_STRING,
-        format='password',
-        description=description,
-        example='strongpassword123',
-    )
-
-
-def create_boolean_field(description="", required=False, default=False):
-    return openapi.Schema(
-        type=openapi.TYPE_BOOLEAN,
-        description=description,
-        default=default,
-    )
-
-
-def create_integer_field(description="", example=0, minimum=None, maximum=None):
-    schema = openapi.Schema(
-        type=openapi.TYPE_INTEGER,
-        description=description,
-        example=example,
-    )
-    if minimum is not None:
-        schema.minimum = minimum
-    if maximum is not None:
-        schema.maximum = maximum
-    return schema
-
-
-# ============== Helper Functions ==============
-
-def swagger_auto_schema_with_tag(tag_name):
-    """
-    Decorator factory to add tag to swagger_auto_schema.
-    Usage: @swagger_auto_schema_with_tag("Users")
-    """
-    def decorator(method):
-        @swagger_auto_schema(tags=[tag_name])
-        @wraps(method)
-        def wrapper(*args, **kwargs):
-            return method(*args, **kwargs)
-        return wrapper
-    return decorator
-
-
-def simple_response(success_code=200, description="Success"):
-    """Quick decorator for simple success response."""
-    responses = {
-        success_code: create_success_response(description=description),
-        400: ValidationErrorResponse,
-        404: NotFoundResponse,
-        500: ServerErrorResponse,
-    }
-    def decorator(func):
-        return swagger_auto_schema(responses=responses)(func)
-    return decorator
-
-
 # ============== Standard Response Configurations ==============
 
 COMMON_RESPONSES = {
@@ -217,57 +237,6 @@ AUTH_RESPONSES = {
 }
 
 
-# ============== Standard Request Bodies ==============
-
-EMAIL_REQUEST = openapi.Schema(
-    type=openapi.TYPE_OBJECT,
-    required=['email'],
-    properties={
-        'email': create_email_field(),
-    }
-)
-
-OTP_VERIFY_REQUEST = openapi.Schema(
-    type=openapi.TYPE_OBJECT,
-    required=['email', 'otp'],
-    properties={
-        'email': create_email_field(),
-        'otp': openapi.Schema(
-            type=openapi.TYPE_STRING,
-            description='6-digit OTP code',
-            example='123456',
-        ),
-    }
-)
-
-LOGIN_REQUEST = openapi.Schema(
-    type=openapi.TYPE_OBJECT,
-    required=['email', 'password'],
-    properties={
-        'email': create_email_field(),
-        'password': create_password_field(),
-    }
-)
-
-PASSWORD_RESET_REQUEST = openapi.Schema(
-    type=openapi.TYPE_OBJECT,
-    required=['email'],
-    properties={
-        'email': create_email_field(description="Email address for password reset"),
-    }
-)
-
-PASSWORD_RESET_CONFIRM_REQUEST = openapi.Schema(
-    type=openapi.TYPE_OBJECT,
-    required=['email', 'otp', 'new_password'],
-    properties={
-        'email': create_email_field(),
-        'otp': openapi.Schema(type=openapi.TYPE_STRING, description='OTP code', example='123456'),
-        'new_password': create_password_field(description='New password'),
-    }
-)
-
-
 # ============== Decorator Helper ==============
 
 class SwaggerHelper:
@@ -280,7 +249,7 @@ class SwaggerHelper:
     swagger = SwaggerHelper(tag="Users")
     
     @swagger_auto_schema(
-        **swagger.list_operation(summary="List users", description="Get all users"),
+        **swagger.list_operation(summary="List users", serializer=UserSerializer),
         ...
     )
     def get(self, request):
@@ -290,22 +259,23 @@ class SwaggerHelper:
     def __init__(self, tag="API"):
         self.tag = tag
     
-    def list_operation(self, summary=None, description=None, responses=None):
+    def list_operation(self, summary=None, description=None, serializer=None, responses=None):
         """Generate swagger for list operations (GET)."""
+        schema = get_serializer_schema(serializer) if serializer else openapi.Schema(type=openapi.TYPE_OBJECT)
         return {
             'operation_summary': f"[{self.tag}] {summary or f'List {self.tag.lower()}'}",
             'operation_description': description or f"Retrieve a list of all {self.tag.lower()}.",
             'tags': [self.tag],
             'responses': responses or {
                 200: create_paginated_response(
-                    openapi.Schema(type=openapi.TYPE_OBJECT),
+                    get_serializer_schema(serializer) if serializer else openapi.Schema(type=openapi.TYPE_OBJECT),
                     tag=self.tag
                 ),
                 **COMMON_RESPONSES
             }
         }
     
-    def retrieve_operation(self, summary=None, description=None, responses=None):
+    def retrieve_operation(self, summary=None, description=None, serializer=None, responses=None):
         """Generate swagger for retrieve operations (GET by ID)."""
         return {
             'operation_summary': f"[{self.tag}] {summary or f'Get {self.tag.lower()}'}",
@@ -313,39 +283,39 @@ class SwaggerHelper:
             'tags': [self.tag],
             'responses': responses or {
                 200: create_success_response(
-                    openapi.Schema(type=openapi.TYPE_OBJECT),
+                    get_serializer_schema(serializer) if serializer else openapi.Schema(type=openapi.TYPE_OBJECT),
                     description="Resource retrieved successfully"
                 ),
                 **COMMON_RESPONSES
             }
         }
     
-    def create_operation(self, summary=None, description=None, request_body=None, responses=None):
+    def create_operation(self, summary=None, description=None, serializer=None, responses=None):
         """Generate swagger for create operations (POST)."""
         return {
             'operation_summary': f"[{self.tag}] {summary or f'Create {self.tag.lower()}'}",
             'operation_description': description or f"Create a new {self.tag.lower()}.",
             'tags': [self.tag],
-            'request_body': request_body,
+            'request_body': serializer,
             'responses': responses or {
                 201: create_success_response(
-                    openapi.Schema(type=openapi.TYPE_OBJECT),
+                    get_serializer_schema(serializer) if serializer else openapi.Schema(type=openapi.TYPE_OBJECT),
                     description="Resource created successfully"
                 ),
                 **COMMON_RESPONSES
             }
         }
     
-    def update_operation(self, summary=None, description=None, request_body=None, responses=None):
+    def update_operation(self, summary=None, description=None, serializer=None, responses=None):
         """Generate swagger for update operations (PUT/PATCH)."""
         return {
             'operation_summary': f"[{self.tag}] {summary or f'Update {self.tag.lower()}'}",
             'operation_description': description or f"Update an existing {self.tag.lower()}.",
             'tags': [self.tag],
-            'request_body': request_body,
+            'request_body': serializer,
             'responses': responses or {
                 200: create_success_response(
-                    openapi.Schema(type=openapi.TYPE_OBJECT),
+                    get_serializer_schema(serializer) if serializer else openapi.Schema(type=openapi.TYPE_OBJECT),
                     description="Resource updated successfully"
                 ),
                 **COMMON_RESPONSES

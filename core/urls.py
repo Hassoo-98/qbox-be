@@ -1,5 +1,5 @@
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import path, include, re_path
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
@@ -15,6 +15,7 @@ schema_view = get_schema_view(
     ),
     public=True,
     permission_classes=(permissions.AllowAny,),
+    url='http://localhost:8000/',
 )
 
 urlpatterns = [
@@ -28,7 +29,7 @@ urlpatterns = [
     path("api/service_provider", include("service_provider.urls")),
     path("api/locations", include("locations.urls")),
     # Swagger URLs
-    path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
-    path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
-    path('swagger/schema/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger'),
+    re_path(r'^swagger/$', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
+    re_path(r'^redoc/$', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
+    re_path(r'^swagger/schema/$', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger'),
 ]

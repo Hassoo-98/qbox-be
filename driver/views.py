@@ -5,7 +5,6 @@ from rest_framework import generics,status,filters
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import PageNumberPagination
-from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from .models import CustomDriver
@@ -16,13 +15,16 @@ from .serializers import (
     DriverUpdateSerializer
 )
 from utils.swagger_schema import (
+    SwaggerHelper,
+    get_serializer_schema,
+    create_success_response,
     ValidationErrorResponse,
     NotFoundResponse,
-    ServerErrorResponse,
+    COMMON_RESPONSES,
 )
 
-# Swagger Tag
-DRIVER_TAG = 'Driver'
+
+swagger = SwaggerHelper(tag="Driver")
 
 
 class StandardResultsPagination(PageNumberPagination):
@@ -40,41 +42,17 @@ class DriverListAPIView(generics.ListAPIView):
     serializer_class = DriverSerializer
     permission_classes = [IsAuthenticated]
     pagination_class = StandardResultsPagination
-    filter_backends = [filters.SearchFilter, filters.OrderingFilter, DjangoFilterBackend]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["name", "email", "phone_number"]
     ordering_fields = ["name", "email", "phone_number"]
     ordering = ["-date_joined"]
-    filterset_fields = ["is_active"]
 
     @swagger_auto_schema(
-        operation_summary="[Driver] List all drivers",
-        operation_description="Retrieve a paginated list of all drivers with optional filtering by search query, ordering, and active status.",
-        tags=[DRIVER_TAG],
-        responses={
-            200: openapi.Response(
-                description="Drivers retrieved successfully",
-                schema=openapi.Schema(
-                    type=openapi.TYPE_OBJECT,
-                    properties={
-                        'success': openapi.Schema(type=openapi.TYPE_BOOLEAN),
-                        'statusCode': openapi.Schema(type=openapi.TYPE_INTEGER),
-                        'message': openapi.Schema(type=openapi.TYPE_STRING),
-                        'data': openapi.Schema(
-                            type=openapi.TYPE_OBJECT,
-                            properties={
-                                'items': openapi.Schema(type=openapi.TYPE_ARRAY, items=DriverSerializer),
-                                'total': openapi.Schema(type=openapi.TYPE_INTEGER),
-                                'page': openapi.Schema(type=openapi.TYPE_INTEGER),
-                                'limit': openapi.Schema(type=openapi.TYPE_INTEGER),
-                                'hasMore': openapi.Schema(type=openapi.TYPE_BOOLEAN),
-                            }
-                        ),
-                    }
-                )
-            ),
-            401: openapi.Response(description="Authentication required"),
-            500: ServerErrorResponse,
-        }
+        **swagger.list_operation(
+            summary="List all drivers",
+            description="Retrieve a paginated list of all drivers with optional filtering by search query, ordering, and active status.",
+            serializer=DriverSerializer
+        )
     )
     def get_paginated_response(self, data):
         return Response({
@@ -119,19 +97,11 @@ class DriverCreateAPIView(generics.CreateAPIView):
     permission_classes = [IsAuthenticated]
 
     @swagger_auto_schema(
-        operation_summary="[Driver] Create a new driver",
-        operation_description="Register a new driver with personal and vehicle information.",
-        tags=[DRIVER_TAG],
-        request_body=DriverCreateSerializer,
-        responses={
-            201: openapi.Response(
-                description="Driver created successfully",
-                schema=DriverSerializer
-            ),
-            400: ValidationErrorResponse,
-            401: openapi.Response(description="Authentication required"),
-            500: ServerErrorResponse,
-        }
+        **swagger.create_operation(
+            summary="Create a new driver",
+            description="Register a new driver with personal information, vehicle details, and licensing information.",
+            serializer=DriverCreateSerializer
+        )
     )
     def create(self, request, *args, **kwargs):
         try:
@@ -161,20 +131,11 @@ class DriverUpdateAPIView(generics.UpdateAPIView):
     lookup_field = "id"
 
     @swagger_auto_schema(
-        operation_summary="[Driver] Update driver",
-        operation_description="Update driver information such as name, phone, vehicle details, etc.",
-        tags=[DRIVER_TAG],
-        request_body=DriverUpdateSerializer,
-        responses={
-            200: openapi.Response(
-                description="Driver updated successfully",
-                schema=DriverSerializer
-            ),
-            400: ValidationErrorResponse,
-            401: openapi.Response(description="Authentication required"),
-            404: NotFoundResponse,
-            500: ServerErrorResponse,
-        }
+        **swagger.update_operation(
+            summary="Update driver",
+            description="Update driver information such as name, phone, vehicle details, license information, etc.",
+            serializer=DriverUpdateSerializer
+        )
     )
     def update(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -197,16 +158,15 @@ class DriverStatusUpdateAPIView(generics.UpdateAPIView):
 
     @swagger_auto_schema(
         operation_summary="[Driver] Update driver status",
-        operation_description="Update driver active status (activate or deactivate driver account).",
-        tags=[DRIVER_TAG],
+        operation_description="Update driver active status. Activating a driver allows them to receive delivery assignments. Deactivating temporarily suspends their ability to receive new assignments.",
+        tags=["Driver"],
         request_body=DriverStatusUpdateSerializer,
         responses={
-            200: openapi.Response(
-                description="Driver status updated successfully",
-                schema=DriverSerializer
+            200: create_success_response(
+                get_serializer_schema(DriverSerializer),
+                description="Driver status updated successfully"
             ),
             400: ValidationErrorResponse,
-            401: openapi.Response(description="Authentication required"),
             404: NotFoundResponse,
         }
     )
@@ -234,25 +194,10 @@ class DriverDeleteAPIView(generics.DestroyAPIView):
     lookup_field = "id"
 
     @swagger_auto_schema(
-        operation_summary="[Driver] Delete driver",
-        operation_description="Remove a driver from the system. This action is permanent.",
-        tags=[DRIVER_TAG],
-        responses={
-            200: openapi.Response(
-                description="Driver deleted successfully",
-                schema=openapi.Schema(
-                    type=openapi.TYPE_OBJECT,
-                    properties={
-                        'success': openapi.Schema(type=openapi.TYPE_BOOLEAN),
-                        'statusCode': openapi.Schema(type=openapi.TYPE_INTEGER),
-                        'message': openapi.Schema(type=openapi.TYPE_STRING),
-                        'data': DriverSerializer,
-                    }
-                )
-            ),
-            401: openapi.Response(description="Authentication required"),
-            404: NotFoundResponse,
-        }
+        **swagger.delete_operation(
+            summary="Delete driver",
+            description="Remove a driver from the system. This action is permanent and cannot be undone."
+        )
     )
     def destroy(self, request, *args, **kwargs):
         driver = self.get_object()
@@ -273,17 +218,11 @@ class DriverDetailAPIView(generics.RetrieveAPIView):
     lookup_field = "id"
 
     @swagger_auto_schema(
-        operation_summary="[Driver] Get driver details",
-        operation_description="Retrieve detailed information about a specific driver by ID.",
-        tags=[DRIVER_TAG],
-        responses={
-            200: openapi.Response(
-                description="Driver details retrieved successfully",
-                schema=DriverSerializer
-            ),
-            401: openapi.Response(description="Authentication required"),
-            404: NotFoundResponse,
-        }
+        **swagger.retrieve_operation(
+            summary="Get driver details",
+            description="Retrieve detailed information about a specific driver including personal info, vehicle details, and current status.",
+            serializer=DriverSerializer
+        )
     )
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()

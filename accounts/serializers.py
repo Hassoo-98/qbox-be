@@ -53,3 +53,40 @@ class RegisterSerializer(serializers.ModelSerializer):
             status=validated_data.get("status", True)
         )
         return user
+
+class LoginSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True)
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomUser
+        fields = ('id', 'email', 'name', 'phone_number', 'status', 'role', 'email_verified')
+        read_only_fields = ('id', 'email_verified')
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomUser
+        fields = ('id', 'email', 'name', 'phone_number', 'status', 'role', 'email_verified')
+        read_only_fields = ('id', 'email', 'role', 'email_verified')
+
+class ChangePasswordSerializer(serializers.Serializer):
+    old_password = serializers.CharField(required=True)
+    new_password = serializers.CharField(required=True, min_length=8)
+
+    def validate(self, attrs):
+        if attrs['old_password'] == attrs['new_password']:
+            raise serializers.ValidationError({"new_password": "New password cannot be the same as old password"})
+        return attrs
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    new_password = serializers.CharField(required=True, min_length=8)
+    uidb64 = serializers.CharField(required=True)
+    token = serializers.CharField(required=True)
+
+class OTPSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    otp = serializers.CharField(required=True, max_length=6)

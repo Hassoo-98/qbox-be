@@ -1,49 +1,55 @@
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.pagination import PageNumberPagination
+from rest_framework import filters
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from .models import Package
 from .serializers import (
-    PackageSerializer, PackageListSerializer,
-    PackageCreateSerializer, PackageUpdateSerializer
+    PackageSerializer,
+    PackageCreateSerializer,
+    PackageStatusUpdateSerializer,
 )
 from utils.swagger_schema import (
+    SwaggerHelper,
+    get_serializer_schema,
+    create_success_response,
     ValidationErrorResponse,
     NotFoundResponse,
+    COMMON_RESPONSES,
 )
 
-# Swagger Tag
-PACKAGES_TAG = 'Packages'
+# Swagger Helper for Package
+swagger = SwaggerHelper(tag="Package")
+
+
+class StandardResultsPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = "limit"
+    max_page_size = 100
+    page_query_param = "page"
 
 
 class PackageListAPIView(generics.ListAPIView):
-    """
-    GET: List all packages
-    """
+    '''
+    Get: list all packages with pagination and filters
+    '''
     queryset = Package.objects.all()
-    serializer_class = PackageListSerializer
+    serializer_class = PackageSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = StandardResultsPagination
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ["name", "description"]
+    ordering_fields = ["name", "price", "duration_days"]
+    ordering = ["name"]
 
     @swagger_auto_schema(
-        operation_summary="[Packages] List all packages",
-        operation_description="Retrieve a paginated list of all packages.",
-        tags=[PACKAGES_TAG],
-        responses={
-            200: openapi.Response(
-                description="Packages retrieved successfully",
-                schema=openapi.Schema(
-                    type=openapi.TYPE_OBJECT,
-                    properties={
-                        'success': openapi.Schema(type=openapi.TYPE_BOOLEAN),
-                        'statusCode': openapi.Schema(type=openapi.TYPE_INTEGER),
-                        'message': openapi.Schema(type=openapi.TYPE_STRING),
-                        'data': openapi.Schema(type=openapi.TYPE_OBJECT),
-                    }
-                )
-            ),
-            401: openapi.Response(description="Authentication required"),
-        }
+        **swagger.list_operation(
+            summary="List all packages",
+            description="Retrieve a paginated list of all packages with optional filtering by search query, ordering, active status, and package type.",
+            serializer=PackageSerializer
+        )
     )
     def get_paginated_response(self, data):
         return Response({
@@ -56,7 +62,7 @@ class PackageListAPIView(generics.ListAPIView):
                 "limit": self.paginator.page_size,
                 "hasMore": self.paginator.page.has_next(),
             },
-            "message": "Package List"
+            "message": "List Packages"
         })
 
     def list(self, request, *args, **kwargs):
@@ -72,210 +78,127 @@ class PackageListAPIView(generics.ListAPIView):
             "data": {
                 "items": serializer.data,
                 "total": len(serializer.data),
+                "page": 1,
+                "limit": queryset.count() if queryset.count() < self.pagination_class.page_size else self.pagination_class.page_size,
                 "hasMore": False
-            },
-            "message": "Package List"
-        })
-
-
-class PackageDetailAPIView(generics.RetrieveAPIView):
-    """
-    GET: Get package details by ID
-    """
-    queryset = Package.objects.all()
-    serializer_class = PackageSerializer
-    permission_classes = [IsAuthenticated]
-    lookup_field = "id"
-
-    @swagger_auto_schema(
-        operation_summary="[Packages] Get package details",
-        operation_description="Retrieve detailed information about a specific package by ID.",
-        tags=[PACKAGES_TAG],
-        responses={
-            200: openapi.Response(
-                description="Package details retrieved successfully",
-                schema=PackageSerializer
-            ),
-            401: openapi.Response(description="Authentication required"),
-            404: NotFoundResponse,
-        }
-    )
-    def retrieve(self, request, *args, **kwargs):
-        instance = self.get_object()
-        serializer = self.get_serializer(instance)
-        return Response({
-            "success": True,
-            "statusCode": status.HTTP_200_OK,
-            "data": serializer.data,
-            "message": "Package Details"
-        })
-
-
-class PackageByTrackingIdAPIView(generics.RetrieveAPIView):
-    """
-    GET: Get package by tracking_id
-    """
-    queryset = Package.objects.all()
-    serializer_class = PackageSerializer
-    permission_classes = [IsAuthenticated]
-    lookup_field = "tracking_id"
-
-    @swagger_auto_schema(
-        operation_summary="[Packages] Get package by tracking ID",
-        operation_description="Retrieve package details using tracking ID.",
-        tags=[PACKAGES_TAG],
-        responses={
-            200: openapi.Response(
-                description="Package retrieved successfully",
-                schema=PackageSerializer
-            ),
-            401: openapi.Response(description="Authentication required"),
-            404: NotFoundResponse,
-        }
-    )
-    def retrieve(self, request, *args, **kwargs):
-        instance = self.get_object()
-        serializer = self.get_serializer(instance)
-        return Response({
-            "success": True,
-            "statusCode": status.HTTP_200_OK,
-            "data": serializer.data,
-            "message": "Package Details"
-        })
-
-
-class PackagesByQboxIdAPIView(generics.ListAPIView):
-    """
-    GET: List all packages for a specific qbox by qbox UUID
-    """
-    queryset = Package.objects.all()
-    serializer_class = PackageListSerializer
-    permission_classes = [IsAuthenticated]
-
-    @swagger_auto_schema(
-        operation_summary="[Packages] List packages by QBox ID",
-        operation_description="Retrieve all packages associated with a specific QBox ID.",
-        tags=[PACKAGES_TAG],
-        responses={
-            200: openapi.Response(
-                description="Packages retrieved successfully",
-                schema=openapi.Schema(
-                    type=openapi.TYPE_OBJECT,
-                    properties={
-                        'success': openapi.Schema(type=openapi.TYPE_BOOLEAN),
-                        'statusCode': openapi.Schema(type=openapi.TYPE_INTEGER),
-                        'message': openapi.Schema(type=openapi.TYPE_STRING),
-                        'data': openapi.Schema(type=openapi.TYPE_OBJECT),
-                    }
-                )
-            ),
-            401: openapi.Response(description="Authentication required"),
-            404: openapi.Response(description="No packages found"),
-        }
-    )
-    def get_queryset(self):
-        qbox_uuid = self.kwargs.get('qbox_uuid')
-        if qbox_uuid:
-            return Package.objects.filter(qbox__id=qbox_uuid)
-        return Package.objects.none()
-
-    def list(self, request, *args, **kwargs):
-        queryset = self.get_queryset()
-        if not queryset.exists():
-            return Response({
-                "success": False,
-                "statusCode": status.HTTP_404_NOT_FOUND,
-                "data": [],
-                "message": "No packages found for this qbox"
-            }, status=status.HTTP_404_NOT_FOUND)
-        
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
-        serializer = self.get_serializer(queryset, many=True)
-        return Response({
-            "success": True,
-            "statusCode": status.HTTP_200_OK,
-            "data": {
-                "items": serializer.data,
-                "total": len(serializer.data),
-                "hasMore": False
-            },
-            "message": "Package List"
-        })
-
-    def get_paginated_response(self, data):
-        return Response({
-            "success": True,
-            "statusCode": status.HTTP_200_OK,
-            "data": {
-                "items": data,
-                "total": self.paginator.page.paginator.count,
-                "page": self.paginator.page.number,
-                "limit": self.paginator.page_size,
-                "hasMore": self.paginator.page.has_next(),
-            },
-            "message": "Package List"
+            }
         })
 
 
 class PackageCreateAPIView(generics.CreateAPIView):
-    """
-    POST: Create a new package
-    """
+    '''
+    Post: Create a new package
+    '''
     queryset = Package.objects.all()
     serializer_class = PackageCreateSerializer
     permission_classes = [IsAuthenticated]
 
     @swagger_auto_schema(
-        operation_summary="[Packages] Create package",
-        operation_description="Create a new package with delivery details.",
-        tags=[PACKAGES_TAG],
-        request_body=PackageCreateSerializer,
-        responses={
-            201: openapi.Response(
-                description="Package created successfully",
-                schema=PackageSerializer
-            ),
-            400: ValidationErrorResponse,
-            401: openapi.Response(description="Authentication required"),
-        }
+        **swagger.create_operation(
+            summary="Create a new package",
+            description="Register a new subscription package with name, description, pricing, and duration.",
+            serializer=PackageCreateSerializer
+        )
     )
     def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        package = serializer.save()
+        try:
+            serializer = self.get_serializer(data=request.data)
+            if serializer.is_valid(raise_exception=True):
+                package = serializer.save()
+                package_data = PackageSerializer(package).data
+                return Response({
+                    "success": True,
+                    "statusCode": status.HTTP_201_CREATED,
+                    "data": package_data,
+                    "message": "Package created successfully"
+                }, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({
+                "success": False,
+                "statusCode": status.HTTP_400_BAD_REQUEST,
+                "data": None,
+                "message": str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+
+class PackageDetailAPIView(generics.RetrieveAPIView):
+    '''
+    Get: Retrieve a single package
+    '''
+    queryset = Package.objects.all()
+    serializer_class = PackageSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = "id"
+
+    @swagger_auto_schema(
+        **swagger.retrieve_operation(
+            summary="Get package details",
+            description="Retrieve detailed information about a specific package including pricing, duration, and features.",
+            serializer=PackageSerializer
+        )
+    )
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
         return Response({
             "success": True,
-            "statusCode": status.HTTP_201_CREATED,
-            "data": PackageSerializer(package).data,
-            "message": "Package created successfully"
-        }, status=status.HTTP_201_CREATED)
+            "statusCode": status.HTTP_200_OK,
+            "data": serializer.data,
+            "message": "Get Package"
+        }, status=status.HTTP_200_OK)
 
 
 class PackageUpdateAPIView(generics.UpdateAPIView):
-    """
-    PUT/PATCH: Update package
-    """
+    '''
+    Put: Update a package
+    '''
     queryset = Package.objects.all()
-    serializer_class = PackageUpdateSerializer
+    serializer_class = PackageSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = "id"
+
+    @swagger_auto_schema(
+        **swagger.update_operation(
+            summary="Update package",
+            description="Update package information such as name, description, price, duration, or active status.",
+            serializer=PackageSerializer
+        )
+    )
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response({
+            "success": True,
+            "statusCode": status.HTTP_200_OK,
+            "data": serializer.data,
+            "message": "Package updated successfully"
+        }, status=status.HTTP_200_OK)
+
+
+class PackageStatusUpdateAPIView(generics.UpdateAPIView):
+    '''
+    Patch: Update package active status
+    '''
+    queryset = Package.objects.all()
+    serializer_class = PackageStatusUpdateSerializer
     permission_classes = [IsAuthenticated]
     lookup_field = "id"
     http_method_names = ['patch']
 
     @swagger_auto_schema(
-        operation_summary="[Packages] Update package",
-        operation_description="Update package information such as status, weight, or delivery details.",
-        tags=[PACKAGES_TAG],
-        request_body=PackageUpdateSerializer,
+        operation_summary="[Package] Update package status",
+        operation_description="Update package active status. Activating a package makes it available for subscription. Deactivating hides it from the subscription options.",
+        tags=["Package"],
+        request_body=PackageStatusUpdateSerializer,
         responses={
-            200: openapi.Response(
-                description="Package updated successfully",
-                schema=PackageSerializer
+            200: create_success_response(
+                get_serializer_schema(PackageSerializer),
+                description="Package status updated successfully"
             ),
             400: ValidationErrorResponse,
-            401: openapi.Response(description="Authentication required"),
             404: NotFoundResponse,
         }
     )
@@ -283,47 +206,41 @@ class PackageUpdateAPIView(generics.UpdateAPIView):
         return self.partial_update(request, *args, **kwargs)
 
     def partial_update(self, request, *args, **kwargs):
+        partial = True
         instance = self.get_object()
-        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
-        package = serializer.save()
+        self.perform_update(serializer)
         return Response({
             "success": True,
             "statusCode": status.HTTP_200_OK,
-            "data": PackageSerializer(package).data,
-            "message": "Package updated successfully"
-        })
+            "data": PackageSerializer(serializer.instance).data,
+            "message": "Package status updated successfully"
+        }, status=status.HTTP_200_OK)
 
 
 class PackageDeleteAPIView(generics.DestroyAPIView):
-    """
-    DELETE: Delete package
-    """
+    '''
+    Delete: Remove a package
+    '''
     queryset = Package.objects.all()
     serializer_class = PackageSerializer
     permission_classes = [IsAuthenticated]
     lookup_field = "id"
 
     @swagger_auto_schema(
-        operation_summary="[Packages] Delete package",
-        operation_description="Remove a package from the system.",
-        tags=[PACKAGES_TAG],
-        responses={
-            200: openapi.Response(
-                description="Package deleted successfully",
-                schema=PackageSerializer
-            ),
-            401: openapi.Response(description="Authentication required"),
-            404: NotFoundResponse,
-        }
+        **swagger.delete_operation(
+            summary="Delete package",
+            description="Remove a package from the system. This action is permanent and cannot be undone."
+        )
     )
     def destroy(self, request, *args, **kwargs):
-        instance = self.get_object()
-        data = PackageSerializer(instance).data
-        instance.delete()
+        package = self.get_object()
+        package_data = PackageSerializer(package).data
+        package.delete()
         return Response({
             "success": True,
             "statusCode": status.HTTP_200_OK,
-            "data": data,
+            "data": package_data,
             "message": "Package deleted successfully"
-        })
+        }, status=status.HTTP_200_OK)

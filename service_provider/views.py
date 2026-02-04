@@ -6,9 +6,17 @@ from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from .models import ServiceProvider
 from .serializers import ServiceProviderSerializer, ServiceProviderApprovalSerializer
+from utils.swagger_schema import (
+    SwaggerHelper,
+    get_serializer_schema,
+    create_success_response,
+    ValidationErrorResponse,
+    NotFoundResponse,
+    COMMON_RESPONSES,
+)
 
-# Swagger Tags
-SERVICE_PROVIDER_TAG = 'Service Provider'
+# Swagger Helper for Service Provider
+swagger = SwaggerHelper(tag="Service Provider")
 
 
 class ServiceProviderListCreateView(APIView):
@@ -17,30 +25,25 @@ class ServiceProviderListCreateView(APIView):
     POST: Create a new service provider
     """
     permission_classes = [AllowAny]
-    
+
     @swagger_auto_schema(
-        operation_summary="[Service Provider] List all service providers",
-        operation_description="Retrieve a list of all service providers registered in the system. Returns detailed information including business registration number, contact details, operating cities, and approval status.",
-        tags=[SERVICE_PROVIDER_TAG],
-        responses={
-            200: ServiceProviderSerializer(many=True),
-            400: "Bad Request",
-        }
+        **swagger.list_operation(
+            summary="List all service providers",
+            description="Retrieve a list of all service providers registered in the system with their business details, approval status, and operating cities.",
+            serializer=ServiceProviderSerializer
+        )
     )
     def get(self, request):
         service_providers = ServiceProvider.objects.all()
         serializer = ServiceProviderSerializer(service_providers, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
-    
+
     @swagger_auto_schema(
-        operation_summary="[Service Provider] Create a new service provider",
-        operation_description="Register a new service provider in the system with business details including name, business registration number, contact person, phone, email, operating cities, and pricing configuration.",
-        tags=[SERVICE_PROVIDER_TAG],
-        request_body=ServiceProviderSerializer,
-        responses={
-            201: ServiceProviderSerializer,
-            400: "Validation errors",
-        }
+        **swagger.create_operation(
+            summary="Create a new service provider",
+            description="Register a new service provider with business registration, contact details, operating cities, and pricing configuration.",
+            serializer=ServiceProviderSerializer
+        )
     )
     def post(self, request):
         serializer = ServiceProviderSerializer(data=request.data)
@@ -56,15 +59,13 @@ class ServiceProviderDetailView(APIView):
     DELETE: Delete a service provider
     """
     permission_classes = [AllowAny]
-    
+
     @swagger_auto_schema(
-        operation_summary="[Service Provider] Get a single service provider",
-        operation_description="Retrieve detailed information about a specific service provider by ID. Returns all business details, operating schedule, pricing configuration, and approval status.",
-        tags=[SERVICE_PROVIDER_TAG],
-        responses={
-            200: ServiceProviderSerializer,
-            404: "Service provider not found",
-        }
+        **swagger.retrieve_operation(
+            summary="Get a single service provider",
+            description="Retrieve detailed information about a specific service provider including business details, operating schedule, and approval status.",
+            serializer=ServiceProviderSerializer
+        )
     )
     def get(self, request, pk):
         try:
@@ -76,15 +77,12 @@ class ServiceProviderDetailView(APIView):
             )
         serializer = ServiceProviderSerializer(service_provider)
         return Response(serializer.data, status=status.HTTP_200_OK)
-    
+
     @swagger_auto_schema(
-        operation_summary="[Service Provider] Delete a service provider",
-        operation_description="Remove a service provider from the system by ID. This action is permanent and cannot be undone.",
-        tags=[SERVICE_PROVIDER_TAG],
-        responses={
-            200: "Service provider deleted successfully",
-            404: "Service provider not found",
-        }
+        **swagger.delete_operation(
+            summary="Delete a service provider",
+            description="Remove a service provider from the system. This action is permanent and cannot be undone."
+        )
     )
     def delete(self, request, pk):
         try:
@@ -108,11 +106,11 @@ class ServiceProviderApprovalView(APIView):
     Payload: is_approved (boolean)
     """
     permission_classes = [AllowAny]
-    
+
     @swagger_auto_schema(
         operation_summary="[Service Provider] Approve or disapprove a service provider",
-        operation_description="Update the approval status of a service provider. Setting is_approved to true will approve the provider and allow them to operate. Setting it to false will disapprove and revoke their access.",
-        tags=[SERVICE_PROVIDER_TAG],
+        operation_description="Update the approval status of a service provider. When is_approved is set to true, the provider can start operating. Setting it to false revokes their access.",
+        tags=["Service Provider"],
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
             required=['is_approved'],
@@ -126,10 +124,13 @@ class ServiceProviderApprovalView(APIView):
         responses={
             200: openapi.Response(
                 description="Service provider approval status updated successfully",
-                schema=ServiceProviderSerializer
+                schema=create_success_response(
+                    get_serializer_schema(ServiceProviderSerializer),
+                    description="Approval status updated"
+                ).schema
             ),
-            400: "Validation errors",
-            404: "Service provider not found",
+            400: ValidationErrorResponse,
+            404: NotFoundResponse,
         }
     )
     def patch(self, request, pk):
@@ -140,7 +141,7 @@ class ServiceProviderApprovalView(APIView):
                 {"error": "Service provider not found"},
                 status=status.HTTP_404_NOT_FOUND
             )
-        
+
         serializer = ServiceProviderApprovalSerializer(data=request.data)
         if serializer.is_valid():
             service_provider.is_approved = serializer.validated_data['is_approved']
