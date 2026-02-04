@@ -25,6 +25,8 @@ urlpatterns=[
     path("api/home_owner", include("home_owner.urls")),
     path("api/q_box", include("q_box.urls")),
     path("api/packages", include("packages.urls")),
+    path("api/service_provider", include("service_provider.urls")),
+    path("api/locations", include("locations.urls")),
     # Swagger URLs
     path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
     path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
