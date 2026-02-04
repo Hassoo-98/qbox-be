@@ -16,6 +16,8 @@ import string
 import jwt
 from datetime import datetime, timedelta
 from rest_framework_simplejwt.tokens import RefreshToken
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
 
 from .serializers import RegisterSerializer, CustomTokenObtainPairSerializer
 from .models import CustomUser
@@ -23,16 +25,55 @@ logger = logging.getLogger(__name__)
 JWT_SECRET_KEY = settings.SECRET_KEY
 JWT_ALGORITHM = 'HS256'
 JWT_EXPIRATION_HOURS = 24
+
 def generate_otp(length=6):
     """Generate a random 6-digit OTP code."""
     return ''.join(random.choices(string.digits, k=length))
 
 
-@method_decorator(csrf_exempt, name='dispatch')
+# Swagger Tag
+ACCOUNTS_TAG = 'Authentication'
+
+
 class RegisterView(APIView):
+    """Register a new user in the system."""
     authentication_classes = []
     permission_classes = [AllowAny]
 
+    @swagger_auto_schema(
+        operation_summary="[Authentication] Register a new user",
+        operation_description="Create a new user account. The user will need to verify their email before they can log in. Required fields: name, email, password, phone_number, role.",
+        tags=[ACCOUNTS_TAG],
+        request_body=RegisterSerializer,
+        responses={
+            201: openapi.Response(
+                description="User registered successfully",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'success': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                        'statusCode': openapi.Schema(type=openapi.TYPE_INTEGER),
+                        'message': openapi.Schema(type=openapi.TYPE_STRING),
+                        'data': openapi.Schema(
+                            type=openapi.TYPE_OBJECT,
+                            properties={
+                                'id': openapi.Schema(type=openapi.TYPE_INTEGER),
+                                'name': openapi.Schema(type=openapi.TYPE_STRING),
+                                'email': openapi.Schema(type=openapi.TYPE_STRING),
+                                'phone_number': openapi.Schema(type=openapi.TYPE_STRING),
+                                'status': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                                'role': openapi.Schema(type=openapi.TYPE_STRING),
+                                'email_verified': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                            }
+                        ),
+                        'createdAt': openapi.Schema(type=openapi.TYPE_STRING),
+                    }
+                )
+            ),
+            400: "Validation errors",
+            500: "Internal server error",
+        }
+    )
     def post(self, request):
         logger.info(f"Registration attempt from IP: {request.META.get('REMOTE_ADDR')}")
         logger.debug(f"Request data: {request.data}")
@@ -81,6 +122,28 @@ class VerifyEmailSendOTPView(APIView):
     authentication_classes = []
     permission_classes = [AllowAny]
 
+    @swagger_auto_schema(
+        operation_summary="[Authentication] Send email verification OTP",
+        operation_description="Send a one-time password (OTP) to the user's email address for email verification. The OTP expires in 10 minutes.",
+        tags=[ACCOUNTS_TAG],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=['email'],
+            properties={
+                'email': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    format='email',
+                    description='The email address to send the verification OTP'
+                )
+            }
+        ),
+        responses={
+            200: "OTP sent successfully",
+            400: "Email is required",
+            404: "User not found",
+            500: "Failed to send OTP",
+        }
+    )
     def post(self, request):
         logger.info(f"OTP send request received: {request.data}")
         email = request.data.get('email')
@@ -171,6 +234,31 @@ class VerifyEmailVerifyOTPView(APIView):
     authentication_classes = []
     permission_classes = [AllowAny]
 
+    @swagger_auto_schema(
+        operation_summary="[Authentication] Verify email with OTP",
+        operation_description="Verify the user's email address using the OTP sent to their email. This activates the account for login.",
+        tags=[ACCOUNTS_TAG],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=['email', 'otp'],
+            properties={
+                'email': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    format='email',
+                    description='The email address of the user'
+                ),
+                'otp': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description='The 6-digit OTP received in email'
+                )
+            }
+        ),
+        responses={
+            200: "Email verified successfully",
+            400: "Invalid or expired OTP",
+            404: "User not found",
+        }
+    )
     def post(self, request):
         email = request.data.get('email')
         otp = request.data.get('otp')
@@ -213,13 +301,110 @@ class VerifyEmailVerifyOTPView(APIView):
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
+    """Obtain JWT token pair (access and refresh)."""
     serializer_class = CustomTokenObtainPairSerializer
+    
+    @swagger_auto_schema(
+        operation_summary="[Authentication] Obtain JWT token pair",
+        operation_description="Get access and refresh tokens using email and password. Requires email verification first.",
+        tags=[ACCOUNTS_TAG],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=['email', 'password'],
+            properties={
+                'email': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    format='email',
+                    description='User email address'
+                ),
+                'password': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    format='password',
+                    description='User password'
+                )
+            }
+        ),
+        responses={
+            200: openapi.Response(
+                description="Tokens obtained successfully",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'success': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                        'statusCode': openapi.Schema(type=openapi.TYPE_INTEGER),
+                        'message': openapi.Schema(type=openapi.TYPE_STRING),
+                        'data': openapi.Schema(type=openapi.TYPE_OBJECT),
+                        'access': openapi.Schema(type=openapi.TYPE_STRING),
+                        'refresh': openapi.Schema(type=openapi.TYPE_STRING),
+                        'createdAt': openapi.Schema(type=openapi.TYPE_STRING),
+                    }
+                )
+            ),
+            401: "Invalid email or password",
+            403: "Email not verified",
+        }
+    )
+    def post(self, request, *args, **kwargs):
+        return super().post(request, *args, **kwargs)
 
 
 class LoginView(APIView):
+    """Login user and return JWT tokens."""
     authentication_classes = []
     permission_classes = [AllowAny]
     
+    @swagger_auto_schema(
+        operation_summary="[Authentication] Login user",
+        operation_description="Authenticate user with email and password. Returns JWT access and refresh tokens along with user information. Requires email verification.",
+        tags=[ACCOUNTS_TAG],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=['email', 'password'],
+            properties={
+                'email': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    format='email',
+                    description='User email address'
+                ),
+                'password': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    format='password',
+                    description='User password'
+                )
+            }
+        ),
+        responses={
+            200: openapi.Response(
+                description="Login successful",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'success': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                        'statusCode': openapi.Schema(type=openapi.TYPE_INTEGER),
+                        'message': openapi.Schema(type=openapi.TYPE_STRING),
+                        'data': openapi.Schema(
+                            type=openapi.TYPE_OBJECT,
+                            properties={
+                                'id': openapi.Schema(type=openapi.TYPE_INTEGER),
+                                'name': openapi.Schema(type=openapi.TYPE_STRING),
+                                'email': openapi.Schema(type=openapi.TYPE_STRING),
+                                'phone_number': openapi.Schema(type=openapi.TYPE_STRING),
+                                'status': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                                'role': openapi.Schema(type=openapi.TYPE_STRING),
+                                'email_verified': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                            }
+                        ),
+                        'access': openapi.Schema(type=openapi.TYPE_STRING),
+                        'refresh': openapi.Schema(type=openapi.TYPE_STRING),
+                        'createdAt': openapi.Schema(type=openapi.TYPE_STRING),
+                    }
+                )
+            ),
+            400: "Email and password are required",
+            401: "Invalid email or password",
+            403: "Email not verified",
+        }
+    )
     def post(self, request):
         email = request.data.get('email')
         password = request.data.get('password')
@@ -264,8 +449,8 @@ class LoginView(APIView):
                 "role": user.role,
                 "email_verified": user.email_verified,
             },
-            "access": access_token,     # ← use this in Authorization header
-            "refresh": str(refresh),    # optional – for later refresh
+            "access": access_token,
+            "refresh": str(refresh),
             "createdAt": datetime.utcnow().isoformat()
         }, status=status.HTTP_200_OK)
 
@@ -274,6 +459,28 @@ class Forget_PasswordView(APIView):
     authentication_classes = []
     permission_classes = [AllowAny]
 
+    @swagger_auto_schema(
+        operation_summary="[Authentication] Send password reset OTP",
+        operation_description="Send a one-time password (OTP) to the user's email for password reset. The OTP expires in 10 minutes.",
+        tags=[ACCOUNTS_TAG],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=['email'],
+            properties={
+                'email': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    format='email',
+                    description='The email address to send the password reset OTP'
+                )
+            }
+        ),
+        responses={
+            200: "OTP sent successfully",
+            400: "Email is required",
+            404: "User not found",
+            500: "Failed to send OTP",
+        }
+    )
     def post(self, request):
         logger.info(f"Password reset request received: {request.data}")
         email = request.data.get('email')
@@ -358,6 +565,37 @@ class ResetPasswordConfirmView(APIView):
     authentication_classes = []
     permission_classes = [AllowAny]
 
+    @swagger_auto_schema(
+        operation_summary="[Authentication] Reset password with OTP",
+        operation_description="Verify the OTP sent to the user's email and set a new password. The OTP must match the one sent for password reset.",
+        tags=[ACCOUNTS_TAG],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=['email', 'otp', 'new_password'],
+            properties={
+                'email': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    format='email',
+                    description='The email address of the user'
+                ),
+                'otp': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description='The 6-digit OTP received in email'
+                ),
+                'new_password': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    format='password',
+                    description='The new password to set'
+                )
+            }
+        ),
+        responses={
+            200: "Password reset successfully",
+            400: "Invalid or expired OTP or missing fields",
+            404: "User not found",
+            500: "Failed to reset password",
+        }
+    )
     def post(self, request):
         email = request.data.get('email')
         otp = request.data.get('otp')
@@ -403,4 +641,4 @@ class ResetPasswordConfirmView(APIView):
                 "success": False,
                 "statusCode": 500,
                 "message": f"Failed to reset password: {str(e)}"
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)    
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
