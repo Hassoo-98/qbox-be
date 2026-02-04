@@ -7,6 +7,8 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
 from datetime import timedelta
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
 from .models import CustomHomeOwner
 from .serializers import (
     HomeOwnerSerializer,
@@ -21,6 +23,15 @@ from .serializers import (
     VerifyForgotPasswordOTPSerializer,
     ResetPasswordSerializer
 )
+from utils.swagger_schema import (
+    ValidationErrorResponse,
+    NotFoundResponse,
+    ServerErrorResponse,
+)
+
+# Swagger Tag
+HOME_OWNER_TAG = 'Home Owner'
+
 
 class StandardResultsPagination(PageNumberPagination):
     page_size = 10
@@ -37,6 +48,20 @@ class HomeOwnerSignUpAPIView(generics.CreateAPIView):
     serializer_class = HomeOwnerCreateSerializer
     permission_classes = [AllowAny]
 
+    @swagger_auto_schema(
+        operation_summary="[Home Owner] Register new home owner",
+        operation_description="Register a new home owner account with name, email, phone, and password.",
+        tags=[HOME_OWNER_TAG],
+        request_body=HomeOwnerCreateSerializer,
+        responses={
+            201: openapi.Response(
+                description="Home owner registered successfully",
+                schema=HomeOwnerSerializer
+            ),
+            400: ValidationErrorResponse,
+            500: ServerErrorResponse,
+        }
+    )
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         try:
@@ -64,6 +89,30 @@ class VerifyEmailAPIView(generics.GenericAPIView):
     serializer_class = VerifyEmailSerializer
     permission_classes = [AllowAny]
 
+    @swagger_auto_schema(
+        operation_summary="[Home Owner] Send email verification OTP",
+        operation_description="Send a one-time password (OTP) to the user's email for verification.",
+        tags=[HOME_OWNER_TAG],
+        request_body=VerifyEmailSerializer,
+        responses={
+            200: openapi.Response(
+                description="OTP sent successfully",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'success': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                        'statusCode': openapi.Schema(type=openapi.TYPE_INTEGER),
+                        'message': openapi.Schema(type=openapi.TYPE_STRING),
+                        'data': openapi.Schema(
+                            type=openapi.TYPE_OBJECT,
+                            properties={'otp_key': openapi.Schema(type=openapi.TYPE_STRING)}
+                        ),
+                    }
+                )
+            ),
+            404: NotFoundResponse,
+        }
+    )
     def post(self, request):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -74,11 +123,10 @@ class VerifyEmailAPIView(generics.GenericAPIView):
             otp = CustomHomeOwner.generate_otp()
             user.email_otp = otp
             user.save()
-            # In production, send this OTP via email
             return Response({
                 "success": True,
                 "statusCode": status.HTTP_200_OK,
-                "data": {"otp_key": otp},  # Only for testing/dev
+                "data": {"otp_key": otp},
                 "message": "OTP sent to your email"
             })
         except ObjectDoesNotExist:
@@ -89,7 +137,6 @@ class VerifyEmailAPIView(generics.GenericAPIView):
             })
 
 
-# Similar for phone and qbox — just change field & message
 class VerifyPhoneAPIView(generics.GenericAPIView):
     """
     POST: Send phone verification OTP
@@ -97,6 +144,30 @@ class VerifyPhoneAPIView(generics.GenericAPIView):
     serializer_class = VerifyPhoneSerializer
     permission_classes = [AllowAny]
 
+    @swagger_auto_schema(
+        operation_summary="[Home Owner] Send phone verification OTP",
+        operation_description="Send a one-time password (OTP) to the user's phone for verification.",
+        tags=[HOME_OWNER_TAG],
+        request_body=VerifyPhoneSerializer,
+        responses={
+            200: openapi.Response(
+                description="OTP sent successfully",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'success': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                        'statusCode': openapi.Schema(type=openapi.TYPE_INTEGER),
+                        'message': openapi.Schema(type=openapi.TYPE_STRING),
+                        'data': openapi.Schema(
+                            type=openapi.TYPE_OBJECT,
+                            properties={'otp_key': openapi.Schema(type=openapi.TYPE_STRING)}
+                        ),
+                    }
+                )
+            ),
+            404: NotFoundResponse,
+        }
+    )
     def post(self, request):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -107,11 +178,10 @@ class VerifyPhoneAPIView(generics.GenericAPIView):
             otp = CustomHomeOwner.generate_otp()
             user.phone_otp = otp
             user.save()
-            # In production, send this OTP via SMS
             return Response({
                 "success": True,
                 "statusCode": status.HTTP_200_OK,
-                "data": {"otp_key": otp},  # Only for testing/dev
+                "data": {"otp_key": otp},
                 "message": "OTP sent to your phone"
             })
         except ObjectDoesNotExist:
@@ -129,6 +199,27 @@ class VerifyOTPAPIView(generics.GenericAPIView):
     serializer_class = VerifyOTPSerializer
     permission_classes = [AllowAny]
 
+    @swagger_auto_schema(
+        operation_summary="[Home Owner] Verify OTP",
+        operation_description="Verify the OTP sent for email or phone verification.",
+        tags=[HOME_OWNER_TAG],
+        request_body=VerifyOTPSerializer,
+        responses={
+            200: openapi.Response(
+                description="OTP verified successfully",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'success': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                        'statusCode': openapi.Schema(type=openapi.TYPE_INTEGER),
+                        'message': openapi.Schema(type=openapi.TYPE_STRING),
+                    }
+                )
+            ),
+            400: ValidationErrorResponse,
+            404: NotFoundResponse,
+        }
+    )
     def post(self, request):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -185,6 +276,27 @@ class VerifyQBoxAPIView(generics.GenericAPIView):
     serializer_class = VerifyQBoxSerializer
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(
+        operation_summary="[Home Owner] Verify QBox ID",
+        operation_description="Verify ownership of a QBox ID associated with the home owner.",
+        tags=[HOME_OWNER_TAG],
+        request_body=VerifyQBoxSerializer,
+        responses={
+            200: openapi.Response(
+                description="QBox ID verified successfully",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'success': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                        'statusCode': openapi.Schema(type=openapi.TYPE_INTEGER),
+                        'message': openapi.Schema(type=openapi.TYPE_STRING),
+                    }
+                )
+            ),
+            403: openapi.Response(description="QBox belongs to another user"),
+            404: NotFoundResponse,
+        }
+    )
     def post(self, request):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -219,7 +331,7 @@ class HomeOwnerListAPIView(generics.ListAPIView):
     """
     queryset = CustomHomeOwner.objects.all()
     serializer_class = HomeOwnerSerializer
-    permission_classes = [IsAuthenticated]           # ← change to custom admin perm if needed
+    permission_classes = [IsAuthenticated]
     pagination_class = StandardResultsPagination
     filter_backends = [filters.SearchFilter, DjangoFilterBackend, filters.OrderingFilter]
     search_fields = ["full_name", "email", "phone_number", "qbox_id"]
@@ -227,6 +339,26 @@ class HomeOwnerListAPIView(generics.ListAPIView):
     ordering = ["-date_joined"]
     filterset_fields = ["is_active", "is_verified"]
 
+    @swagger_auto_schema(
+        operation_summary="[Home Owner] List all home owners",
+        operation_description="Retrieve a paginated list of all home owners with filtering options.",
+        tags=[HOME_OWNER_TAG],
+        responses={
+            200: openapi.Response(
+                description="Home owners retrieved successfully",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'success': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                        'statusCode': openapi.Schema(type=openapi.TYPE_INTEGER),
+                        'message': openapi.Schema(type=openapi.TYPE_STRING),
+                        'data': openapi.Schema(type=openapi.TYPE_OBJECT),
+                    }
+                )
+            ),
+            401: openapi.Response(description="Authentication required"),
+        }
+    )
     def get_paginated_response(self, data):
         return Response({
             "success": True,
@@ -249,6 +381,21 @@ class HomeOwnerStatusUpdateAPIView(generics.UpdateAPIView):
     lookup_field = "id"
     http_method_names = ['patch']
 
+    @swagger_auto_schema(
+        operation_summary="[Home Owner] Update home owner status",
+        operation_description="Update home owner active status.",
+        tags=[HOME_OWNER_TAG],
+        request_body=HomeOwnerStatusUpdateSerializer,
+        responses={
+            200: openapi.Response(
+                description="Home owner status updated successfully",
+                schema=HomeOwnerSerializer
+            ),
+            400: ValidationErrorResponse,
+            401: openapi.Response(description="Authentication required"),
+            404: NotFoundResponse,
+        }
+    )
     def patch(self, request, *args, **kwargs):
         return self.partial_update(request, *args, **kwargs)
 
@@ -270,6 +417,19 @@ class HomeOwnerDeleteAPIView(generics.DestroyAPIView):
     permission_classes = [IsAuthenticated]
     lookup_field = "id"
 
+    @swagger_auto_schema(
+        operation_summary="[Home Owner] Delete home owner",
+        operation_description="Remove a home owner account from the system.",
+        tags=[HOME_OWNER_TAG],
+        responses={
+            200: openapi.Response(
+                description="Home owner deleted successfully",
+                schema=HomeOwnerSerializer
+            ),
+            401: openapi.Response(description="Authentication required"),
+            404: NotFoundResponse,
+        }
+    )
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
         data = HomeOwnerSerializer(instance).data
@@ -289,6 +449,30 @@ class ForgotPasswordAPIView(generics.GenericAPIView):
     serializer_class = ForgotPasswordSerializer
     permission_classes = [AllowAny]
 
+    @swagger_auto_schema(
+        operation_summary="[Home Owner] Send password reset OTP",
+        operation_description="Send a password reset OTP to email or phone.",
+        tags=[HOME_OWNER_TAG],
+        request_body=ForgotPasswordSerializer,
+        responses={
+            200: openapi.Response(
+                description="OTP sent successfully",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'success': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                        'statusCode': openapi.Schema(type=openapi.TYPE_INTEGER),
+                        'message': openapi.Schema(type=openapi.TYPE_STRING),
+                        'data': openapi.Schema(
+                            type=openapi.TYPE_OBJECT,
+                            properties={'otp_key': openapi.Schema(type=openapi.TYPE_STRING)}
+                        ),
+                    }
+                )
+            ),
+            404: NotFoundResponse,
+        }
+    )
     def post(self, request):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -303,11 +487,10 @@ class ForgotPasswordAPIView(generics.GenericAPIView):
                 user.password_reset_otp = otp
                 user.password_reset_otp_expires = timezone.now() + timedelta(minutes=10)
                 user.save()
-                # In production, send OTP via email
                 return Response({
                     "success": True,
                     "statusCode": status.HTTP_200_OK,
-                    "data": {"otp_key": otp},  # Only for testing/dev
+                    "data": {"otp_key": otp},
                     "message": f"Password reset OTP sent to your email"
                 })
             elif send_via == 'phone':
@@ -320,11 +503,10 @@ class ForgotPasswordAPIView(generics.GenericAPIView):
                 user.password_reset_otp = otp
                 user.password_reset_otp_expires = timezone.now() + timedelta(minutes=10)
                 user.save()
-                # In production, send OTP via SMS
                 return Response({
                     "success": True,
                     "statusCode": status.HTTP_200_OK,
-                    "data": {"otp_key": otp},  # Only for testing/dev
+                    "data": {"otp_key": otp},
                     "message": f"Password reset OTP sent to your phone"
                 })
                 
@@ -343,17 +525,36 @@ class VerifyForgotPasswordOTPAPIView(generics.GenericAPIView):
     serializer_class = VerifyForgotPasswordOTPSerializer
     permission_classes = [AllowAny]
 
+    @swagger_auto_schema(
+        operation_summary="[Home Owner] Verify password reset OTP",
+        operation_description="Verify the OTP for password reset. OTP expires in 10 minutes.",
+        tags=[HOME_OWNER_TAG],
+        request_body=VerifyForgotPasswordOTPSerializer,
+        responses={
+            200: openapi.Response(
+                description="OTP verified successfully",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'success': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                        'statusCode': openapi.Schema(type=openapi.TYPE_INTEGER),
+                        'message': openapi.Schema(type=openapi.TYPE_STRING),
+                    }
+                )
+            ),
+            400: ValidationErrorResponse,
+            404: NotFoundResponse,
+        }
+    )
     def post(self, request):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         email = serializer.validated_data['email']
         otp = serializer.validated_data['otp']
-        send_via = serializer.validated_data.get('send_via', 'email')
         
         try:
             user = CustomHomeOwner.objects.get(email=email)
             
-            # Check if OTP is valid and not expired
             if (user.password_reset_otp == otp and 
                 user.password_reset_otp_expires and 
                 user.password_reset_otp_expires > timezone.now()):
@@ -385,6 +586,27 @@ class ResetPasswordAPIView(generics.GenericAPIView):
     serializer_class = ResetPasswordSerializer
     permission_classes = [AllowAny]
 
+    @swagger_auto_schema(
+        operation_summary="[Home Owner] Reset password",
+        operation_description="Reset password after OTP verification.",
+        tags=[HOME_OWNER_TAG],
+        request_body=ResetPasswordSerializer,
+        responses={
+            200: openapi.Response(
+                description="Password reset successfully",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'success': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                        'statusCode': openapi.Schema(type=openapi.TYPE_INTEGER),
+                        'message': openapi.Schema(type=openapi.TYPE_STRING),
+                    }
+                )
+            ),
+            400: ValidationErrorResponse,
+            404: NotFoundResponse,
+        }
+    )
     def post(self, request):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -395,7 +617,6 @@ class ResetPasswordAPIView(generics.GenericAPIView):
         try:
             user = CustomHomeOwner.objects.get(email=email)
             
-            # Check if OTP is valid and not expired
             if (user.password_reset_otp == otp and 
                 user.password_reset_otp_expires and 
                 user.password_reset_otp_expires > timezone.now()):
