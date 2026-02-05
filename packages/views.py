@@ -40,9 +40,9 @@ class PackageListAPIView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
     pagination_class = StandardResultsPagination
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-    search_fields = ["name", "description"]
-    ordering_fields = ["name", "price", "duration_days"]
-    ordering = ["name"]
+    search_fields = ["tracking_id", "merchant_name", "service_provider", "driver_name"]
+    ordering_fields = ["tracking_id", "merchant_name", "service_provider", "driver_name", "created_at", "last_update", "package_status", "shipment_status"]
+    ordering = ["-created_at"]
 
     @swagger_auto_schema(
         **swagger.list_operation(
