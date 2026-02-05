@@ -6,6 +6,7 @@ from django.core.mail import send_mail
 from django.conf import settings
 from django.utils.http import urlsafe_base64_decode
 from django.utils.encoding import force_str
+from django.utils import timezone
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from rest_framework import generics, status, permissions,viewsets
@@ -14,6 +15,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.tokens import RefreshToken
 from .models import CustomUser
+from home_owner.models import CustomHomeOwner
 from .serializers import (
     RegisterSerializer,
     LoginSerializer,
@@ -22,8 +24,10 @@ from .serializers import (
     ChangePasswordSerializer,
     PasswordResetRequestSerializer,
     PasswordResetConfirmSerializer,
-    OTPSerializer
+    OTPSerializer,
+    SendOTPSerializer
 )
+from home_owner.serializers import HomeOwnerSerializer
 from utils.swagger_schema import (
     SwaggerHelper,
     get_serializer_schema,
@@ -77,7 +81,7 @@ class RegisterView(generics.CreateAPIView):
             return Response({
                 "success": True,
                 "statusCode": status.HTTP_201_CREATED,
-                "data": UserSerializer(user).data,
+                "data":user.data,
                 "message": "User registered successfully. Please check your email to verify your account."
             }, status=status.HTTP_201_CREATED)
 
@@ -380,7 +384,7 @@ class VerifyEmailView(APIView):
 
 class OTPVerificationView(generics.CreateAPIView):
     """
-    Verify user with OTP sent to email
+    Verify user OTP sent to email or phone
     """
     serializer_class = OTPSerializer
     permission_classes = [permissions.AllowAny]
@@ -388,16 +392,179 @@ class OTPVerificationView(generics.CreateAPIView):
     @swagger_auto_schema(
         **swagger.create_operation(
             summary="Verify OTP",
-            description="Verify user email using the OTP sent to their email address.",
+            description="Verify user OTP sent to email or phone. Requires email or phone_number and OTP. Set is_home_owner=true to verify home_owner table instead of user table.",
             serializer=OTPSerializer
         )
     )
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        
+        email = serializer.validated_data.get('email')
+        phone_number = serializer.validated_data.get('phone_number')
+        otp = serializer.validated_data['otp']
+        is_home_owner = serializer.validated_data.get('is_home_owner', False)
+        try:
+            if is_home_owner:
+                if email:
+                    user = CustomHomeOwner.objects.get(email=email)
+                else:
+                    user = CustomHomeOwner.objects.get(phone_number=phone_number)
+            else:
+                if email:
+                    user = CustomUser.objects.get(email=email)
+                else:
+                    user = CustomUser.objects.get(phone_number=phone_number)
+        except (CustomUser.DoesNotExist, CustomHomeOwner.DoesNotExist):
+            return Response({
+                "success": False,
+                "statusCode": status.HTTP_400_BAD_REQUEST,
+                "data": None,
+                "message": "Invalid user"
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        if is_home_owner:
+            otp_field = user.password_reset_otp
+            otp_expires_field = user.password_reset_otp_expires
+        else:
+            otp_field = user.reset_password_token
+            otp_expires_field = user.reset_password_token_expires
+        
+        if otp_field != otp:
+            return Response({
+                "success": False,
+                "statusCode": status.HTTP_400_BAD_REQUEST,
+                "data": None,
+                "message": "Invalid OTP"
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        if otp_expires_field and otp_expires_field < timezone.now():
+            return Response({
+                "success": False,
+                "statusCode": status.HTTP_400_BAD_REQUEST,
+                "data": None,
+                "message": "OTP has expired"
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        user.email_verified = True
+        
+        if is_home_owner:
+            user.is_verified = True
+        
+        # Clear OTP fields
+        if is_home_owner:
+            user.password_reset_otp = None
+            user.password_reset_otp_expires = None
+        else:
+            user.reset_password_token = None
+            user.reset_password_token_expires = None
+        user.save()
+        
+        # Use appropriate serializer based on user type
+        if is_home_owner:
+            serializer = HomeOwnerSerializer(user)
+        else:
+            serializer = UserSerializer(user)
+        
         return Response({
             "success": True,
             "statusCode": status.HTTP_200_OK,
-            "data": None,
+            "data":None,
             "message": "OTP verified successfully"
         }, status=status.HTTP_200_OK)
+
+
+class SendOTPView(generics.CreateAPIView):
+    """
+    Send OTP for verification (email or phone_number)
+    """
+    serializer_class = SendOTPSerializer
+    permission_classes = [permissions.AllowAny]
+
+    @swagger_auto_schema(
+        **swagger.create_operation(
+            summary="Send OTP",
+            description="Send OTP to user's email or phone for verification. Provide either email or phone_number (or both with verification_type). If only email is provided, verification_type defaults to 'email'. If only phone_number is provided, verification_type defaults to 'phone_number'. Set is_home_owner=true to look up home_owner table instead of user table.",
+            serializer=SendOTPSerializer
+        )
+    )
+    def post(self, request, *args, **kwargs):
+        import random
+        
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        email = serializer.validated_data.get('email')
+        phone_number = serializer.validated_data.get('phone_number')
+        verification_type = serializer.validated_data['verification_type']
+        is_home_owner = serializer.validated_data.get('is_home_owner', False)
+        
+        # Find user by email or phone_number based on verification_type and is_home_owner
+        try:
+            if is_home_owner:
+                if verification_type == 'email':
+                    user = CustomHomeOwner.objects.get(email=email)
+                else:
+                    user = CustomHomeOwner.objects.get(phone_number=phone_number)
+            else:
+                if verification_type == 'email':
+                    user = CustomUser.objects.get(email=email)
+                else:
+                    user = CustomUser.objects.get(phone_number=phone_number)
+        except (CustomUser.DoesNotExist, CustomHomeOwner.DoesNotExist):
+            return Response({
+                "success": False,
+                "statusCode": status.HTTP_404_NOT_FOUND,
+                "data": None,
+                "message": "User with this email or phone number does not exist"
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        otp = ''.join([str(random.randint(0, 9)) for _ in range(6)])
+        
+        # Save OTP based on user type
+        if is_home_owner:
+            user.password_reset_otp = otp
+            user.password_reset_otp_expires = timezone.now() + timezone.timedelta(minutes=10)
+        else:
+            user.reset_password_token = otp
+            user.reset_password_token_expires = timezone.now() + timezone.timedelta(minutes=10)
+        user.save()
+        
+        if verification_type == 'email':
+            subject = 'Your OTP for Email Verification'
+            message = f'Your OTP is: {otp}. This OTP will expire in 10 minutes.'
+            try:
+                send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [user.email])
+            except Exception as e:
+                return Response({
+                    "success": False,
+                    "statusCode": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    "data": None,
+                    "message": f"Failed to send OTP email: {str(e)}"
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            return Response({
+                "success": True,
+                "statusCode": status.HTTP_200_OK,
+                "data": {
+                    "email": user.email,
+                    "verification_type": verification_type,
+                    "message": f"OTP sent successfully to {verification_type}",
+                    "otp":otp
+                },
+                "message": "OTP sent successfully"
+            }, status=status.HTTP_200_OK)
+        
+        elif verification_type == 'phone_number':
+           
+            return Response({
+                "success": True,
+                "statusCode": status.HTTP_200_OK,
+                "data": {
+                    "phone_number": user.phone_number,
+                    "verification_type": verification_type,
+                    "otp": otp,  
+                    "message": "OTP sent to phone number"
+                },
+                "message": "OTP sent successfully"
+            }, status=status.HTTP_200_OK)
