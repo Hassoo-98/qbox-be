@@ -1,4 +1,4 @@
-from rest_framework import generics, status
+from rest_framework import generics, status, permissions
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import PageNumberPagination
@@ -10,7 +10,10 @@ from .serializers import (
     HomeOwnerSerializer,
     HomeOwnerCreateSerializer,
     HomeOwnerStatusUpdateSerializer,
+    HomeOwnerLoginSerializer,
+    HomeOwnerResetPasswordSerializer,
 )
+from q_box.serializers import VerifyQboxIdSerializer
 from utils.swagger_schema import (
     SwaggerHelper,
     get_serializer_schema,
@@ -20,7 +23,6 @@ from utils.swagger_schema import (
     COMMON_RESPONSES,
 )
 
-# Swagger Helper for Home Owner
 swagger = SwaggerHelper(tag="Home Owner")
 
 
@@ -37,7 +39,7 @@ class HomeOwnerListAPIView(generics.ListAPIView):
     '''
     queryset = CustomHomeOwner.objects.all()
     serializer_class = HomeOwnerSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = []
     pagination_class = StandardResultsPagination
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["name", "email", "phone_number"]
@@ -91,7 +93,8 @@ class HomeOwnerCreateAPIView(generics.CreateAPIView):
     '''
     queryset = CustomHomeOwner.objects.all()
     serializer_class = HomeOwnerCreateSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [] 
+    authentication_classes = [] 
 
     @swagger_auto_schema(
         **swagger.create_operation(
@@ -243,3 +246,68 @@ class HomeOwnerDeleteAPIView(generics.DestroyAPIView):
             "data": home_owner_data,
             "message": "Home Owner deleted successfully"
         }, status=status.HTTP_200_OK)
+
+
+class HomeOwnerLoginView(generics.CreateAPIView):
+    """
+    Login for home owner with email or phone number
+    """
+    serializer_class = HomeOwnerLoginSerializer
+    permission_classes = [permissions.AllowAny]
+
+    @swagger_auto_schema(
+        **swagger.create_operation(
+            summary="Home Owner Login",
+            description="Authenticate home owner with email or phone number and password to receive JWT tokens.",
+            serializer=HomeOwnerLoginSerializer
+        )
+    )
+    def post(self, request, *args, **kwargs):
+        from rest_framework_simplejwt.tokens import RefreshToken
+        
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid(raise_exception=True):
+            user = serializer.validated_data['user']
+            refresh = RefreshToken.for_user(user)
+            return Response({
+                "success": True,
+                "statusCode": status.HTTP_200_OK,
+                "data": {
+                    "refresh": str(refresh),
+                    "access": str(refresh.access_token),
+                    "user": HomeOwnerSerializer(user).data
+                },
+                "message": "Login successful"
+            }, status=status.HTTP_200_OK)
+
+
+class HomeOwnerResetPasswordView(generics.CreateAPIView):
+    """
+    Reset password for home owner with email and new password
+    """
+    serializer_class = HomeOwnerResetPasswordSerializer
+    permission_classes = [permissions.AllowAny]
+
+    @swagger_auto_schema(
+        **swagger.create_operation(
+            summary="Reset Home Owner Password",
+            description="Reset the password for a home owner using their email and new password.",
+            serializer=HomeOwnerResetPasswordSerializer
+        )
+    )
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid(raise_exception=True):
+            user = serializer.validated_data['user']
+            new_password = serializer.validated_data['new_password']
+            
+            # Set the new password
+            user.set_password(new_password)
+            user.save()
+            
+            return Response({
+                "success": True,
+                "statusCode": status.HTTP_200_OK,
+                "data": None,
+                "message": "Password reset successfully"
+            }, status=status.HTTP_200_OK)
