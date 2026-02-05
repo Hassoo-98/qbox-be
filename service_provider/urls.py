@@ -3,6 +3,6 @@ from .views import ServiceProviderListCreateView, ServiceProviderDetailView, Ser
 
 urlpatterns = [
     path('', ServiceProviderListCreateView.as_view(), name='service-provider-list-create'),
-    path('<int:pk>/', ServiceProviderDetailView.as_view(), name='service-provider-detail'),
-    path('<int:pk>/approve/', ServiceProviderApprovalView.as_view(), name='service-provider-approve'),
+    path('<int:pk>', ServiceProviderDetailView.as_view(), name='service-provider-detail'),
+    path('<int:pk>/approve', ServiceProviderApprovalView.as_view(), name='service-provider-approve'),
 ]
