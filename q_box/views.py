@@ -10,7 +10,9 @@ from .serializers import (
     QboxSerializer,
     QboxCreateSerializer,
     QboxStatusUpdateSerializer,
+    VerifyQboxIdSerializer,
 )
+from home_owner.models import CustomHomeOwner
 from utils.swagger_schema import (
     SwaggerHelper,
     get_serializer_schema,
@@ -242,4 +244,68 @@ class QboxDeleteAPIView(generics.DestroyAPIView):
             "statusCode": status.HTTP_200_OK,
             "data": qbox_data,
             "message": "QBox deleted successfully"
+        }, status=status.HTTP_200_OK)
+
+
+class VerifyQboxIdAPIView(generics.CreateAPIView):
+    """
+    Post: Verify QBox ID and assign it to the authenticated home owner
+    """
+    serializer_class = VerifyQboxIdSerializer
+    permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(
+        **swagger.create_operation(
+            summary="Verify QBox ID",
+            description="Verify a QBox device ID and assign it to the authenticated home owner. The QBox must exist in the system.",
+            serializer=VerifyQboxIdSerializer
+        )
+    )
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        # Get authenticated home owner from request
+        home_owner = request.user
+        qbox_id = serializer.validated_data['qbox_id']
+        
+        # Check if the authenticated user is a home owner
+        if not isinstance(home_owner, CustomHomeOwner):
+            return Response({
+                "success": False,
+                "statusCode": status.HTTP_403_FORBIDDEN,
+                "data": None,
+                "message": "Only home owners can verify QBox ID"
+            }, status=status.HTTP_403_FORBIDDEN)
+        
+        # Find the QBox
+        try:
+            qbox = Qbox.objects.get(qbox_id=qbox_id)
+        except Qbox.DoesNotExist:
+            return Response({
+                "success": False,
+                "statusCode": status.HTTP_404_NOT_FOUND,
+                "data": None,
+                "message": "QBox with this ID not found"
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Check if QBox is already assigned to another home owner
+        if qbox.homeowner and qbox.homeowner.id != home_owner.id:
+            return Response({
+                "success": False,
+                "statusCode": status.HTTP_400_BAD_REQUEST,
+                "data": None,
+                "message": "QBox is already assigned to another home owner"
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Assign QBox to home owner
+        qbox.homeowner = home_owner
+        qbox.sync_with_homeowner(save=True)
+        qbox.save()
+        
+        return Response({
+            "success": True,
+            "statusCode": status.HTTP_200_OK,
+            "data": QboxSerializer(qbox).data,
+            "message": "QBox verified and assigned successfully"
         }, status=status.HTTP_200_OK)
