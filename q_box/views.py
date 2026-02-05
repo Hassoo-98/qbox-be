@@ -10,7 +10,9 @@ from .serializers import (
     QboxSerializer,
     QboxCreateSerializer,
     QboxStatusUpdateSerializer,
+    VerifyQboxIdSerializer,
 )
+from home_owner.models import CustomHomeOwner
 from utils.swagger_schema import (
     SwaggerHelper,
     get_serializer_schema,
@@ -47,7 +49,8 @@ class QboxListAPIView(generics.ListAPIView):
         **swagger.list_operation(
             summary="List all QBoxes",
             description="Retrieve a paginated list of all QBoxes with optional filtering by search query, ordering, active status, and current status.",
-            serializer=QboxSerializer
+            serializer=QboxSerializer,
+             tags=["QBox"]
         )
     )
     def get_paginated_response(self, data):
@@ -64,7 +67,7 @@ class QboxListAPIView(generics.ListAPIView):
             "message": "List QBoxes"
         })
 
-    def list(self, request, *args, **kwargs):
+    def get(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(queryset)
         if page is not None:
@@ -99,7 +102,7 @@ class QboxCreateAPIView(generics.CreateAPIView):
             serializer=QboxCreateSerializer
         )
     )
-    def create(self, request, *args, **kwargs):
+    def post(self, request, *args, **kwargs):
         try:
             serializer = self.get_serializer(data=request.data)
             if serializer.is_valid(raise_exception=True):
@@ -136,7 +139,7 @@ class QboxDetailAPIView(generics.RetrieveAPIView):
             serializer=QboxSerializer
         )
     )
-    def retrieve(self, request, *args, **kwargs):
+    def get(self, request, *args, **kwargs):
         instance = self.get_object()
         serializer = self.get_serializer(instance)
         return Response({
@@ -163,7 +166,7 @@ class QboxUpdateAPIView(generics.UpdateAPIView):
             serializer=QboxSerializer
         )
     )
-    def update(self, request, *args, **kwargs):
+    def patch(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
@@ -191,7 +194,6 @@ class QboxStatusUpdateAPIView(generics.UpdateAPIView):
         operation_summary="[QBox] Update QBox status",
         operation_description="Update QBox status and active state. This controls whether the QBox can receive deliveries.",
         tags=["QBox"],
-        request_body=QboxStatusUpdateSerializer,
         responses={
             200: create_success_response(
                 get_serializer_schema(QboxSerializer),
@@ -202,9 +204,9 @@ class QboxStatusUpdateAPIView(generics.UpdateAPIView):
         }
     )
     def patch(self, request, *args, **kwargs):
-        return self.partial_update(request, *args, **kwargs)
+        return self.update(request, *args, **kwargs)
 
-    def partial_update(self, request, *args, **kwargs):
+    def patch(self, request, *args, **kwargs):
         partial = True
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
@@ -233,7 +235,7 @@ class QboxDeleteAPIView(generics.DestroyAPIView):
             description="Remove a QBox from the system. This action is permanent and cannot be undone."
         )
     )
-    def destroy(self, request, *args, **kwargs):
+    def delete(self, request, *args, **kwargs):
         qbox = self.get_object()
         qbox_data = QboxSerializer(qbox).data
         qbox.delete()
@@ -242,4 +244,68 @@ class QboxDeleteAPIView(generics.DestroyAPIView):
             "statusCode": status.HTTP_200_OK,
             "data": qbox_data,
             "message": "QBox deleted successfully"
+        }, status=status.HTTP_200_OK)
+
+
+class VerifyQboxIdAPIView(generics.CreateAPIView):
+    """
+    Post: Verify QBox ID and assign it to the authenticated home owner
+    """
+    serializer_class = VerifyQboxIdSerializer
+    permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(
+        **swagger.create_operation(
+            summary="Verify QBox ID",
+            description="Verify a QBox device ID and assign it to the authenticated home owner. The QBox must exist in the system.",
+            serializer=VerifyQboxIdSerializer
+        )
+    )
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        # Get authenticated home owner from request
+        home_owner = request.user
+        qbox_id = serializer.validated_data['qbox_id']
+        
+        # Check if the authenticated user is a home owner
+        if not isinstance(home_owner, CustomHomeOwner):
+            return Response({
+                "success": False,
+                "statusCode": status.HTTP_403_FORBIDDEN,
+                "data": None,
+                "message": "Only home owners can verify QBox ID"
+            }, status=status.HTTP_403_FORBIDDEN)
+        
+        # Find the QBox
+        try:
+            qbox = Qbox.objects.get(qbox_id=qbox_id)
+        except Qbox.DoesNotExist:
+            return Response({
+                "success": False,
+                "statusCode": status.HTTP_404_NOT_FOUND,
+                "data": None,
+                "message": "QBox with this ID not found"
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Check if QBox is already assigned to another home owner
+        if qbox.homeowner and qbox.homeowner.id != home_owner.id:
+            return Response({
+                "success": False,
+                "statusCode": status.HTTP_400_BAD_REQUEST,
+                "data": None,
+                "message": "QBox is already assigned to another home owner"
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Assign QBox to home owner
+        qbox.homeowner = home_owner
+        qbox.sync_with_homeowner(save=True)
+        qbox.save()
+        
+        return Response({
+            "success": True,
+            "statusCode": status.HTTP_200_OK,
+            "data": QboxSerializer(qbox).data,
+            "message": "QBox verified and assigned successfully"
         }, status=status.HTTP_200_OK)

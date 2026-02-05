@@ -13,18 +13,24 @@ def get_serializer_schema(serializer_class, many=False):
     """
     if serializer_class is None:
         return openapi.Schema(type=openapi.TYPE_OBJECT)
-    
-    # Create an instance to get fields
-    if many:
-        serializer = serializer_class(many=True)
+    if isinstance(serializer_class, serializers.BaseSerializer):
+        if isinstance(serializer_class, serializers.ListSerializer):
+            actual_serializer = serializer_class.child
+        else:
+            actual_serializer = serializer_class
     else:
-        serializer = serializer_class()
+        if many:
+            serializer = serializer_class(many=True)
+
+            actual_serializer = serializer.child
+        else:
+            serializer = serializer_class()
+            actual_serializer = serializer
     
     properties = {}
     required_fields = []
     
-    for field_name, field in serializer.fields.items():
-        # Determine field type
+    for field_name, field in actual_serializer.fields.items():
         field_type = None
         format_str = None
         
@@ -133,7 +139,6 @@ def create_success_response(data_schema=None, description="Success", message="Op
 
 
 def create_paginated_response(item_schema, tag="Items"):
-    """Create a paginated list response schema."""
     return openapi.Response(
         description=f"List of {tag}",
         schema=openapi.Schema(
@@ -145,15 +150,20 @@ def create_paginated_response(item_schema, tag="Items"):
                 'data': openapi.Schema(
                     type=openapi.TYPE_OBJECT,
                     properties={
-                        'count': openapi.Schema(type=openapi.TYPE_INTEGER),
-                        'next': openapi.Schema(type=openapi.TYPE_STRING, nullable=True),
-                        'previous': openapi.Schema(type=openapi.TYPE_STRING, nullable=True),
-                        'results': openapi.Schema(type=openapi.TYPE_ARRAY, items=item_schema),
+                        'items': openapi.Schema(
+                            type=openapi.TYPE_ARRAY,
+                            items=item_schema
+                        ),
+                        'total': openapi.Schema(type=openapi.TYPE_INTEGER),
+                        'page': openapi.Schema(type=openapi.TYPE_INTEGER),
+                        'limit': openapi.Schema(type=openapi.TYPE_INTEGER),
+                        'hasMore': openapi.Schema(type=openapi.TYPE_BOOLEAN),
                     }
                 ),
             }
         )
     )
+
 
 
 # ============== Error Response Schemas ==============
@@ -259,10 +269,10 @@ class SwaggerHelper:
     def __init__(self, tag="API"):
         self.tag = tag
     
-    def list_operation(self, summary=None, description=None, serializer=None, responses=None):
+    def list_operation(self, summary=None, description=None, serializer=None, responses=None, **kwargs):
         """Generate swagger for list operations (GET)."""
         schema = get_serializer_schema(serializer) if serializer else openapi.Schema(type=openapi.TYPE_OBJECT)
-        return {
+        result = {
             'operation_summary': f"[{self.tag}] {summary or f'List {self.tag.lower()}'}",
             'operation_description': description or f"Retrieve a list of all {self.tag.lower()}.",
             'tags': [self.tag],
@@ -274,10 +284,12 @@ class SwaggerHelper:
                 **COMMON_RESPONSES
             }
         }
+        result.update(kwargs)
+        return result
     
-    def retrieve_operation(self, summary=None, description=None, serializer=None, responses=None):
+    def retrieve_operation(self, summary=None, description=None, serializer=None, responses=None, **kwargs):
         """Generate swagger for retrieve operations (GET by ID)."""
-        return {
+        result = {
             'operation_summary': f"[{self.tag}] {summary or f'Get {self.tag.lower()}'}",
             'operation_description': description or f"Retrieve a specific {self.tag.lower()} by ID.",
             'tags': [self.tag],
@@ -289,14 +301,15 @@ class SwaggerHelper:
                 **COMMON_RESPONSES
             }
         }
+        result.update(kwargs)
+        return result
     
-    def create_operation(self, summary=None, description=None, serializer=None, responses=None):
+    def create_operation(self, summary=None, description=None, serializer=None, responses=None, **kwargs):
         """Generate swagger for create operations (POST)."""
-        return {
+        result = {
             'operation_summary': f"[{self.tag}] {summary or f'Create {self.tag.lower()}'}",
             'operation_description': description or f"Create a new {self.tag.lower()}.",
             'tags': [self.tag],
-            'request_body': serializer,
             'responses': responses or {
                 201: create_success_response(
                     get_serializer_schema(serializer) if serializer else openapi.Schema(type=openapi.TYPE_OBJECT),
@@ -305,14 +318,15 @@ class SwaggerHelper:
                 **COMMON_RESPONSES
             }
         }
+        result.update(kwargs)
+        return result
     
-    def update_operation(self, summary=None, description=None, serializer=None, responses=None):
+    def update_operation(self, summary=None, description=None, serializer=None, responses=None, **kwargs):
         """Generate swagger for update operations (PUT/PATCH)."""
-        return {
+        result = {
             'operation_summary': f"[{self.tag}] {summary or f'Update {self.tag.lower()}'}",
             'operation_description': description or f"Update an existing {self.tag.lower()}.",
             'tags': [self.tag],
-            'request_body': serializer,
             'responses': responses or {
                 200: create_success_response(
                     get_serializer_schema(serializer) if serializer else openapi.Schema(type=openapi.TYPE_OBJECT),
@@ -321,10 +335,12 @@ class SwaggerHelper:
                 **COMMON_RESPONSES
             }
         }
+        result.update(kwargs)
+        return result
     
-    def delete_operation(self, summary=None, description=None, responses=None):
+    def delete_operation(self, summary=None, description=None, responses=None, **kwargs):
         """Generate swagger for delete operations (DELETE)."""
-        return {
+        result = {
             'operation_summary': f"[{self.tag}] {summary or f'Delete {self.tag.lower()}'}",
             'operation_description': description or f"Delete a {self.tag.lower()} by ID.",
             'tags': [self.tag],
@@ -333,3 +349,5 @@ class SwaggerHelper:
                 **COMMON_RESPONSES
             }
         }
+        result.update(kwargs)
+        return result

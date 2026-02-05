@@ -70,7 +70,7 @@ class CityListAPIView(generics.ListAPIView):
             "message": "List Cities"
         })
 
-    def list(self, request, *args, **kwargs):
+    def get(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(queryset)
         if page is not None:
@@ -105,7 +105,7 @@ class CityCreateAPIView(generics.CreateAPIView):
             serializer=CityCreateSerializer
         )
     )
-    def create(self, request, *args, **kwargs):
+    def get(self, request, *args, **kwargs):
         try:
             serializer = self.get_serializer(data=request.data)
             if serializer.is_valid(raise_exception=True):
@@ -142,7 +142,7 @@ class CityDetailAPIView(generics.RetrieveAPIView):
             serializer=CitySerializer
         )
     )
-    def retrieve(self, request, *args, **kwargs):
+    def get(self, request, *args, **kwargs):
         instance = self.get_object()
         serializer = self.get_serializer(instance)
         return Response({
@@ -169,7 +169,7 @@ class CityUpdateAPIView(generics.UpdateAPIView):
             serializer=CitySerializer
         )
     )
-    def update(self, request, *args, **kwargs):
+    def patch(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
@@ -197,7 +197,6 @@ class CityStatusUpdateAPIView(generics.UpdateAPIView):
         operation_summary="[Location] Update city status",
         operation_description="Update city active status. Deactivating a city will also deactivate all associated areas.",
         tags=["Location"],
-        request_body=CityStatusUpdateSerializer,
         responses={
             200: create_success_response(
                 get_serializer_schema(CitySerializer),
@@ -208,9 +207,9 @@ class CityStatusUpdateAPIView(generics.UpdateAPIView):
         }
     )
     def patch(self, request, *args, **kwargs):
-        return self.partial_update(request, *args, **kwargs)
+        return self.patch(request, *args, **kwargs)
 
-    def partial_update(self, request, *args, **kwargs):
+    def patch(self, request, *args, **kwargs):
         partial = True
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
@@ -239,7 +238,7 @@ class CityDeleteAPIView(generics.DestroyAPIView):
             description="Remove a city from the system. This action will also remove all associated areas and cannot be undone."
         )
     )
-    def destroy(self, request, *args, **kwargs):
+    def delete(self, request, *args, **kwargs):
         city = self.get_object()
         city_data = CitySerializer(city).data
         city.delete()
@@ -287,7 +286,7 @@ class AreaListAPIView(generics.ListAPIView):
             "message": "List Areas"
         })
 
-    def list(self, request, *args, **kwargs):
+    def get(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(queryset)
         if page is not None:
@@ -322,7 +321,7 @@ class AreaCreateAPIView(generics.CreateAPIView):
             serializer=AreaCreateSerializer
         )
     )
-    def create(self, request, *args, **kwargs):
+    def get(self, request, *args, **kwargs):
         try:
             serializer = self.get_serializer(data=request.data)
             if serializer.is_valid(raise_exception=True):
@@ -359,7 +358,7 @@ class AreaDetailAPIView(generics.RetrieveAPIView):
             serializer=AreaSerializer
         )
     )
-    def retrieve(self, request, *args, **kwargs):
+    def get(self, request, *args, **kwargs):
         instance = self.get_object()
         serializer = self.get_serializer(instance)
         return Response({
@@ -386,7 +385,7 @@ class AreaUpdateAPIView(generics.UpdateAPIView):
             serializer=AreaSerializer
         )
     )
-    def update(self, request, *args, **kwargs):
+    def patch(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
@@ -414,7 +413,6 @@ class AreaStatusUpdateAPIView(generics.UpdateAPIView):
         operation_summary="[Location] Update area status",
         operation_description="Update area active status. This controls whether deliveries can be made to this area.",
         tags=["Location"],
-        request_body=AreaStatusUpdateSerializer,
         responses={
             200: create_success_response(
                 get_serializer_schema(AreaSerializer),
@@ -425,9 +423,9 @@ class AreaStatusUpdateAPIView(generics.UpdateAPIView):
         }
     )
     def patch(self, request, *args, **kwargs):
-        return self.partial_update(request, *args, **kwargs)
+        return self.patch(request, *args, **kwargs)
 
-    def partial_update(self, request, *args, **kwargs):
+    def patch(self, request, *args, **kwargs):
         partial = True
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
@@ -456,7 +454,7 @@ class AreaDeleteAPIView(generics.DestroyAPIView):
             description="Remove an area from the system. This action is permanent and cannot be undone."
         )
     )
-    def destroy(self, request, *args, **kwargs):
+    def delete(self, request, *args, **kwargs):
         area = self.get_object()
         area_data = AreaSerializer(area).data
         area.delete()

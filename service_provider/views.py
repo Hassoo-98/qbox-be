@@ -111,16 +111,6 @@ class ServiceProviderApprovalView(APIView):
         operation_summary="[Service Provider] Approve or disapprove a service provider",
         operation_description="Update the approval status of a service provider. When is_approved is set to true, the provider can start operating. Setting it to false revokes their access.",
         tags=["Service Provider"],
-        request_body=openapi.Schema(
-            type=openapi.TYPE_OBJECT,
-            required=['is_approved'],
-            properties={
-                'is_approved': openapi.Schema(
-                    type=openapi.TYPE_BOOLEAN,
-                    description='Set to true to approve the service provider, false to disapprove'
-                )
-            }
-        ),
         responses={
             200: openapi.Response(
                 description="Service provider approval status updated successfully",

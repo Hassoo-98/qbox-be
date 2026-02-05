@@ -30,6 +30,8 @@ class QboxListSerializer(serializers.ModelSerializer):
         ]
 
 class QboxCreateSerializer(serializers.ModelSerializer):
+    homeowner = serializers.CharField(required=False, allow_null=True, help_text="Homeowner UUID (optional - will be assigned when homeowner creates account with qbox_id)")
+
     class Meta:
         model = Qbox
         fields = [
@@ -38,7 +40,18 @@ class QboxCreateSerializer(serializers.ModelSerializer):
         ]
 
     def create(self, validated_data):
-        qbox = Qbox.objects.create(**validated_data)
+        # Handle homeowner field - convert UUID string to object if provided
+        homeowner_uuid = validated_data.pop('homeowner', None)
+        from home_owner.models import CustomHomeOwner
+        
+        homeowner_obj = None
+        if homeowner_uuid:
+            try:
+                homeowner_obj = CustomHomeOwner.objects.get(id=homeowner_uuid)
+            except CustomHomeOwner.DoesNotExist:
+                pass
+        
+        qbox = Qbox.objects.create(homeowner=homeowner_obj, **validated_data)
         # Sync with homeowner if assigned
         if qbox.homeowner:
             qbox.sync_with_homeowner(save=True)
@@ -69,3 +82,7 @@ class QboxUpdateSerializer(serializers.ModelSerializer):
 class QboxStatusUpdateSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=Qbox.Status.choices, required=True)
     is_active = serializers.BooleanField(required=True)
+
+
+class VerifyQboxIdSerializer(serializers.Serializer):
+    qbox_id = serializers.CharField(required=True, max_length=20, help_text="Unique device identifier of the QBox")

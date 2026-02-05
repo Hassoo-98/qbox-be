@@ -11,6 +11,13 @@ class HomeOwnerAddressSerializer(serializers.ModelSerializer):
         ]
 
 
+class InstallationSerializer(serializers.Serializer):
+    """Serializer for installation details during home owner creation"""
+    location_preference = serializers.CharField(required=True, max_length=255, help_text="Preferred location for QBox installation")
+    access_instruction = serializers.CharField(required=True, max_length=500, help_text="Instructions for accessing the installation location")
+    qbox_image_url = serializers.URLField(required=True, help_text="URL of QBox image")
+
+
 class HomeOwnerSerializer(serializers.ModelSerializer):
     address = HomeOwnerAddressSerializer(read_only=True)
     qboxes = serializers.SerializerMethodField()
@@ -19,7 +26,8 @@ class HomeOwnerSerializer(serializers.ModelSerializer):
         model = CustomHomeOwner
         fields = [
             "id", "full_name", "email", "phone_number", "secondary_phone_number",
-            "is_verified", "email_verified", "phone_verified", "address", "preferred_installment_location",
+            "is_verified", "email_verified", "phone_verified", "address",
+            "installation_location_preference", "installation_access_instruction", "installation_qbox_image_url",
             "is_active", "date_joined", "qboxes"
         ]
         read_only_fields = ["id", "date_joined", "is_verified", "email_verified", "phone_verified"]
@@ -32,29 +40,63 @@ class HomeOwnerSerializer(serializers.ModelSerializer):
 class HomeOwnerCreateSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=True)
     address = HomeOwnerAddressSerializer(required=False)
+    qbox_id = serializers.CharField(required=True, max_length=20, help_text="QBox device ID to assign to this home owner")
+    installation = InstallationSerializer(required=True, help_text="Installation details for QBox")
 
     class Meta:
         model = CustomHomeOwner
         fields = [
             "full_name", "email", "phone_number", "secondary_phone_number",
-            "password", "address", "preferred_installment_location"
+            "password", "address", "installation", "qbox_id"
         ]
 
     def create(self, validated_data):
+        from q_box.models import Qbox
+        
+        qbox_id = validated_data.pop('qbox_id', None)
         address_data = validated_data.pop('address', None)
+        installation_data = validated_data.pop('installation', None)
+        
+        # Extract installation fields
+        installation_location_preference = None
+        installation_access_instruction = None
+        installation_qbox_image_url = None
+        
+        if installation_data:
+            installation_location_preference = installation_data.get('location_preference')
+            installation_access_instruction = installation_data.get('access_instruction')
+            installation_qbox_image_url = installation_data.get('qbox_image_url')
         
         user = CustomHomeOwner.objects.create_user(
             email=validated_data['email'],
             full_name=validated_data['full_name'],
             phone_number=validated_data.get('phone_number'),
             password=validated_data['password'],
-            **{k: v for k, v in validated_data.items() if k not in ['email', 'full_name', 'phone_number', 'password']}
+            installation_location_preference=installation_location_preference,
+            installation_access_instruction=installation_access_instruction,
+            installation_qbox_image_url=installation_qbox_image_url,
+            **{k: v for k, v in validated_data.items() if k not in [
+                'email', 'full_name', 'phone_number', 'password', 
+                'installation_location_preference', 'installation_access_instruction', 
+                'installation_qbox_image_url'
+            ]}
         )
 
         if address_data:
             address = CustomHomeOwnerAddress.objects.create(**address_data)
             user.address = address
             user.save()
+        
+        if qbox_id:
+            try:
+                qbox = Qbox.objects.get(qbox_id=qbox_id)
+                if not qbox.homeowner:
+                    qbox.homeowner = user
+                    qbox.qbox_image = installation_qbox_image_url
+                    qbox.sync_with_homeowner(save=True)
+                    qbox.save()
+            except Qbox.DoesNotExist:
+                pass
 
         return user
 
@@ -124,3 +166,73 @@ class ResetPasswordSerializer(serializers.Serializer):
     email = serializers.EmailField(required=True)
     otp = serializers.CharField(max_length=6, required=True)
     new_password = serializers.CharField(write_only=True, required=True, min_length=8)
+
+
+class HomeOwnerLoginSerializer(serializers.Serializer):
+    """Serializer for home owner login with email or phone number"""
+    email = serializers.EmailField(required=False, allow_blank=True)
+    phone_number = serializers.CharField(required=False, allow_blank=True, max_length=15)
+    password = serializers.CharField(write_only=True, required=True)
+    
+    def validate(self, attrs):
+        email = attrs.get('email')
+        phone_number = attrs.get('phone_number')
+        password = attrs.get('password')
+        
+        if not email and not phone_number:
+            raise serializers.ValidationError({"detail": "Either email or phone_number is required"})
+        
+        if not password:
+            raise serializers.ValidationError({"detail": "Password is required"})
+        if email:
+            try:
+                user = CustomHomeOwner.objects.get(email=email)
+            except CustomHomeOwner.DoesNotExist:
+                raise serializers.ValidationError({"detail": "Invalid credentials"})
+        else:
+            try:
+                user = CustomHomeOwner.objects.get(phone_number=phone_number)
+            except CustomHomeOwner.DoesNotExist:
+                raise serializers.ValidationError({"detail": "Invalid credentials"})
+        
+        if not user.check_password(password):
+            raise serializers.ValidationError({"detail": "Invalid credentials"})
+        
+        if not user.is_active:
+            raise serializers.ValidationError({"detail": "User account is disabled"})
+        
+        attrs['user'] = user
+        return attrs
+
+
+class HomeOwnerResetPasswordSerializer(serializers.Serializer):
+    """Serializer for home owner reset password - takes email or phone_number and new_password"""
+    email = serializers.EmailField(required=False, allow_blank=True)
+    phone_number = serializers.CharField(required=False, allow_blank=True, max_length=15)
+    new_password = serializers.CharField(write_only=True, required=True, min_length=8)
+
+    def validate(self, attrs):
+        email = attrs.get('email')
+        phone_number = attrs.get('phone_number')
+        new_password = attrs.get('new_password')
+        
+        if not email and not phone_number:
+            raise serializers.ValidationError({"detail": "Either email or phone_number is required"})
+        
+        if not new_password:
+            raise serializers.ValidationError({"detail": "New password is required"})
+        
+        # Find user by email or phone_number
+        if email:
+            try:
+                user = CustomHomeOwner.objects.get(email=email)
+            except CustomHomeOwner.DoesNotExist:
+                raise serializers.ValidationError({"detail": "Home owner with this email does not exist"})
+        else:
+            try:
+                user = CustomHomeOwner.objects.get(phone_number=phone_number)
+            except CustomHomeOwner.DoesNotExist:
+                raise serializers.ValidationError({"detail": "Home owner with this phone number does not exist"})
+        
+        attrs['user'] = user
+        return attrs
