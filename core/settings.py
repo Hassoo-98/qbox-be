@@ -20,6 +20,7 @@ ALLOWED_HOSTS = [
 CSRF_TRUSTED_ORIGINS = [
     "https://*.ngrok-free.app",
     "http://localhost:5173",
+    "http://backend.qbox.sa/"
 ]
 
 
@@ -31,6 +32,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:5173",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+      "http://backend.qbox.sa/"
 ]
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_ALL_ORIGINS = False
@@ -114,7 +116,7 @@ REDOC_SETTINGS = {
 }
 
 # Schema URL for drf_yasg
-SCHEMA_URL = 'http://localhost:8000/'
+SCHEMA_URL = 'http://backend.qbox.sa/'
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
