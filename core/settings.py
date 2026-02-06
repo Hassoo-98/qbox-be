@@ -94,7 +94,7 @@ SWAGGER_SETTINGS = {
     },
      "USE_SESSION_AUTH": False,
   'DEFAULT_AUTO_SCHEMA_CLASS': 'drf_yasg.inspectors.SwaggerAutoSchema',
-    'DEFAULT_API_URL': '/',
+       'DEFAULT_API_URL': 'https://backend.qbox.sa/',
     'OPERATIONS_SORTER': 'method',
     'TAGS_SORTER': 'alpha',
     'APIS_SORTER': 'alpha',
