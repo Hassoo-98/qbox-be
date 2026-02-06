@@ -37,11 +37,25 @@ urlpatterns = [
     path("locations/", include("locations.urls")),
     # Swagger URLs
 
-    path("swagger", lambda request: redirect("/swagger/")),
-    path("swagger/", schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
-    path("swagger/schema.json", schema_view.without_ui(cache_timeout=0), name='schema-json'),
-    path("redoc/", schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
+      re_path(
+        r"^swagger/$",
+        schema_view.with_ui("swagger", cache_timeout=0),
+        name="schema-swagger-ui",
+    ),
 
+    # ReDoc UI
+    re_path(
+        r"^redoc/$",
+        schema_view.with_ui("redoc", cache_timeout=0),
+        name="schema-redoc",
+    ),
+
+    # Raw schema (IMPORTANT)
+    re_path(
+        r"^swagger(?P<format>\.json|\.yaml)$",
+        schema_view.without_ui(cache_timeout=0),
+        name="schema-json",
+    ),
 ]
 
 if settings.DEBUG:
