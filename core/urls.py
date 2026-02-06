@@ -18,14 +18,13 @@ schema_view = get_schema_view(
     ),
     public=True,
     permission_classes=(permissions.AllowAny,),
-    url='http://localhost:8000/',
+    url='http://backend.qbox.sa',
 )
-def redirect_to_swagger(request):
-    return redirect('/swagger/')
+
 
 
 urlpatterns = [
-     path('', redirect_to_swagger),
+  
     path("admin/", admin.site.urls),
     path("api/auth", include("accounts.urls")),
     path("api/staff", include("staff.urls")),
