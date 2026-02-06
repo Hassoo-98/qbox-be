@@ -15,6 +15,7 @@ ALLOWED_HOSTS = [
     "127.0.0.1",
     "localhost",
     ".ngrok-free.app",
+    "backend.qbox.sa"
 ]
 CSRF_TRUSTED_ORIGINS = [
     "https://*.ngrok-free.app",
