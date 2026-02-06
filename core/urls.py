@@ -35,11 +35,10 @@ urlpatterns = [
     path("api/service_provider", include("service_provider.urls")),
     path("api/locations", include("locations.urls")),
     # Swagger URLs
-    re_path(r'^swagger/$', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
+    path("/swagger", schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
     re_path(r'^redoc/$', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
     re_path(r'^swagger/schema/$', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger'),
 ]
 
-# Serve media files in development
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
