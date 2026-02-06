@@ -85,17 +85,16 @@ REST_FRAMEWORK={
 
 # Swagger/OpenAPI Settings
 SWAGGER_SETTINGS = {
-    'SECURITY_DEFINITIONS': {
+  'SECURITY_DEFINITIONS': {
         'Bearer': {
             'type': 'apiKey',
             'name': 'Authorization',
             'in': 'header',
-            'description': 'JWT Authorization header using the Bearer scheme. Example: "Authorization: Bearer {token}"'
         }
     },
      "USE_SESSION_AUTH": False,
-    'DEFAULT_AUTO_SCHEMA_CLASS': 'drf_yasg.inspectors.SwaggerAutoSchema',
-    'DEFAULT_API_URL': '/api',
+  'DEFAULT_AUTO_SCHEMA_CLASS': 'drf_yasg.inspectors.SwaggerAutoSchema',
+    'DEFAULT_API_URL': '/',
     'OPERATIONS_SORTER': 'method',
     'TAGS_SORTER': 'alpha',
     'APIS_SORTER': 'alpha',
