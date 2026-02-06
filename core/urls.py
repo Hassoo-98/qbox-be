@@ -29,7 +29,7 @@ urlpatterns = [
     path("api/staff", include("staff.urls")),
     path("api/driver", include("driver.urls")),
     path("api/home_owner", include("home_owner.urls")),
-    path("api/q_box", include("q_box.urls")),
+    path("api/qbox", include("q_box.urls")),
     path("api/packages", include("packages.urls")),
     path("api/service_provider", include("service_provider.urls")),
     path("api/locations", include("locations.urls")),

@@ -72,10 +72,9 @@ class CustomHomeOwner(AbstractUser):
         related_name="homeowner"
     )
 
-    # Installation related fields
     installation_location_preference = models.CharField(max_length=255, blank=True, default="")
     installation_access_instruction = models.CharField(max_length=500, blank=True, default="")
-    installation_qbox_image_url = models.URLField(blank=True, default="")
+    installation_qbox_image_url = models.FileField(blank=True, default="")
 
     preferred_installment_location = models.CharField(max_length=100, blank=True)
     is_active = models.BooleanField(default=True)

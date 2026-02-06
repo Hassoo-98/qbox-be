@@ -568,3 +568,84 @@ class SendOTPView(generics.CreateAPIView):
                 },
                 "message": "OTP sent successfully"
             }, status=status.HTTP_200_OK)
+
+
+class CustomTokenRefreshView(APIView):
+    """
+    Custom token refresh view that handles both CustomUser and CustomHomeOwner tokens
+    """
+    permission_classes = [permissions.AllowAny]
+    
+    def post(self, request, *args, **kwargs):
+        from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
+        
+        refresh_token = request.data.get('refresh')
+        is_home_owner = request.data.get('is_home_owner', False)
+        
+        if not refresh_token:
+            return Response({
+                "success": False,
+                "statusCode": status.HTTP_400_BAD_REQUEST,
+                "data": None,
+                "message": "Refresh token is required"
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            token = RefreshToken(refresh_token)
+            
+            # Get the user_id from the token
+            user_id = token.payload.get('user_id')
+            
+            if user_id:
+                # Check if user_id is a string (could be UUID or integer as string)
+                if isinstance(user_id, str):
+                    try:
+                        # Try to convert to int for CustomUser
+                        user_id_int = int(user_id)
+                        user_id = user_id_int
+                    except ValueError:
+                        # It's a UUID, check if it's a valid user
+                        if is_home_owner:
+                            try:
+                                user = CustomHomeOwner.objects.get(id=user_id)
+                                # Update the token with the correct user_id
+                                token.payload['user_id'] = str(user.id)
+                            except CustomHomeOwner.DoesNotExist:
+                                return Response({
+                                    "success": False,
+                                    "statusCode": status.HTTP_401_UNAUTHORIZED,
+                                    "data": None,
+                                    "message": "Invalid token - home owner not found"
+                                }, status=status.HTTP_401_UNAUTHORIZED)
+                        else:
+                            try:
+                                user = CustomUser.objects.get(id=user_id)
+                                # Update the token with the correct user_id
+                                token.payload['user_id'] = str(user.id)
+                            except CustomUser.DoesNotExist:
+                                return Response({
+                                    "success": False,
+                                    "statusCode": status.HTTP_401_UNAUTHORIZED,
+                                    "data": None,
+                                    "message": "Invalid token - user not found"
+                                }, status=status.HTTP_401_UNAUTHORIZED)
+            
+            # Generate new access token
+            access_token = str(token.access_token)
+            
+            return Response({
+                "success": True,
+                "statusCode": status.HTTP_200_OK,
+                "data": {
+                    "access": access_token
+                },
+                "message": "Token refreshed successfully"
+            }, status=status.HTTP_200_OK)
+            
+        except (InvalidToken, TokenError) as e:
+            return Response({
+                "success": False,
+                "statusCode": status.HTTP_401_UNAUTHORIZED,
+                "data": None,
+                "message": f"Invalid token: {str(e)}. Please login again."
+            }, status=status.HTTP_401_UNAUTHORIZED)

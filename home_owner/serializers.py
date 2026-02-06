@@ -15,7 +15,7 @@ class InstallationSerializer(serializers.Serializer):
     """Serializer for installation details during home owner creation"""
     location_preference = serializers.CharField(required=True, max_length=255, help_text="Preferred location for QBox installation")
     access_instruction = serializers.CharField(required=True, max_length=500, help_text="Instructions for accessing the installation location")
-    qbox_image_url = serializers.URLField(required=True, help_text="URL of QBox image")
+    qbox_image_url = serializers.CharField(required=True, help_text="URL or file path of QBox image")
 
 
 class HomeOwnerSerializer(serializers.ModelSerializer):
@@ -60,7 +60,7 @@ class HomeOwnerCreateSerializer(serializers.ModelSerializer):
         # Extract installation fields
         installation_location_preference = None
         installation_access_instruction = None
-        installation_qbox_image_url = None
+        installation_qbox_image = None
         
         if installation_data:
             installation_location_preference = installation_data.get('location_preference')
@@ -78,10 +78,10 @@ class HomeOwnerCreateSerializer(serializers.ModelSerializer):
             **{k: v for k, v in validated_data.items() if k not in [
                 'email', 'full_name', 'phone_number', 'password', 
                 'installation_location_preference', 'installation_access_instruction', 
-                'installation_qbox_image_url'
+                'installation_qbox_image_url', 'qbox_id', 'address', 'installation'
             ]}
         )
-
+        
         if address_data:
             address = CustomHomeOwnerAddress.objects.create(**address_data)
             user.address = address
@@ -97,7 +97,7 @@ class HomeOwnerCreateSerializer(serializers.ModelSerializer):
                     qbox.save()
             except Qbox.DoesNotExist:
                 pass
-
+        
         return user
 
 
@@ -124,57 +124,14 @@ class HomeOwnerStatusUpdateSerializer(serializers.ModelSerializer):
         }
 
 
-class VerifyEmailSerializer(serializers.Serializer):
-    email = serializers.EmailField(required=True)
-
-
-class VerifyPhoneSerializer(serializers.Serializer):
-    phone_number = serializers.CharField(max_length=10, required=True)
-
-
-class VerifyQBoxSerializer(serializers.Serializer):
-    qbox_id = serializers.CharField(max_length=20, required=True)
-
-
-class VerifyOTPSerializer(serializers.Serializer):
-    email = serializers.EmailField(required=True)
-    otp = serializers.CharField(max_length=6, required=True)
-    verification_type = serializers.ChoiceField(
-        choices=['email', 'phone'],
-        required=True
-    )
-
-
-class ForgotPasswordSerializer(serializers.Serializer):
-    email = serializers.EmailField(required=True)
-    send_via = serializers.ChoiceField(
-        choices=['email', 'phone'],
-        default='email'
-    )
-
-
-class VerifyForgotPasswordOTPSerializer(serializers.Serializer):
-    email = serializers.EmailField(required=True)
-    otp = serializers.CharField(max_length=6, required=True)
-    send_via = serializers.ChoiceField(
-        choices=['email', 'phone'],
-        default='email'
-    )
-
-
-class ResetPasswordSerializer(serializers.Serializer):
-    email = serializers.EmailField(required=True)
-    otp = serializers.CharField(max_length=6, required=True)
-    new_password = serializers.CharField(write_only=True, required=True, min_length=8)
-
-
 class HomeOwnerLoginSerializer(serializers.Serializer):
-    """Serializer for home owner login with email or phone number"""
     email = serializers.EmailField(required=False, allow_blank=True)
     phone_number = serializers.CharField(required=False, allow_blank=True, max_length=15)
-    password = serializers.CharField(write_only=True, required=True)
+    password = serializers.CharField(write_only=True)
     
     def validate(self, attrs):
+        from rest_framework_simplejwt.tokens import RefreshToken
+        
         email = attrs.get('email')
         phone_number = attrs.get('phone_number')
         password = attrs.get('password')
@@ -184,55 +141,52 @@ class HomeOwnerLoginSerializer(serializers.Serializer):
         
         if not password:
             raise serializers.ValidationError({"detail": "Password is required"})
+        
+        user = None
         if email:
             try:
                 user = CustomHomeOwner.objects.get(email=email)
             except CustomHomeOwner.DoesNotExist:
-                raise serializers.ValidationError({"detail": "Invalid credentials"})
+                user = None
         else:
             try:
                 user = CustomHomeOwner.objects.get(phone_number=phone_number)
             except CustomHomeOwner.DoesNotExist:
-                raise serializers.ValidationError({"detail": "Invalid credentials"})
+                user = None
         
+        if user is None:
+            raise serializers.ValidationError({"detail": "Invalid credentials"})
+        
+        # Check password directly instead of using authenticate()
         if not user.check_password(password):
             raise serializers.ValidationError({"detail": "Invalid credentials"})
         
         if not user.is_active:
             raise serializers.ValidationError({"detail": "User account is disabled"})
         
+        # Generate tokens
+        refresh = RefreshToken.for_user(user)
+        tokens = {
+            'access': str(refresh.access_token),
+            'refresh': str(refresh)
+        }
+        
         attrs['user'] = user
+        attrs['tokens'] = tokens
         return attrs
 
 
 class HomeOwnerResetPasswordSerializer(serializers.Serializer):
-    """Serializer for home owner reset password - takes email or phone_number and new_password"""
-    email = serializers.EmailField(required=False, allow_blank=True)
-    phone_number = serializers.CharField(required=False, allow_blank=True, max_length=15)
-    new_password = serializers.CharField(write_only=True, required=True, min_length=8)
-
+    email = serializers.EmailField()
+    new_password = serializers.CharField(required=True, min_length=8)
+    
     def validate(self, attrs):
         email = attrs.get('email')
-        phone_number = attrs.get('phone_number')
-        new_password = attrs.get('new_password')
         
-        if not email and not phone_number:
-            raise serializers.ValidationError({"detail": "Either email or phone_number is required"})
-        
-        if not new_password:
-            raise serializers.ValidationError({"detail": "New password is required"})
-        
-        # Find user by email or phone_number
-        if email:
-            try:
-                user = CustomHomeOwner.objects.get(email=email)
-            except CustomHomeOwner.DoesNotExist:
-                raise serializers.ValidationError({"detail": "Home owner with this email does not exist"})
-        else:
-            try:
-                user = CustomHomeOwner.objects.get(phone_number=phone_number)
-            except CustomHomeOwner.DoesNotExist:
-                raise serializers.ValidationError({"detail": "Home owner with this phone number does not exist"})
+        try:
+            user = CustomHomeOwner.objects.get(email=email)
+        except CustomHomeOwner.DoesNotExist:
+            raise serializers.ValidationError({"detail": "User with this email does not exist"})
         
         attrs['user'] = user
         return attrs

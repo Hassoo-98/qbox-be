@@ -59,6 +59,7 @@ class LoginSerializer(serializers.Serializer):
     
     def validate(self, attrs):
         from django.contrib.auth import authenticate
+        from rest_framework_simplejwt.tokens import RefreshToken
         email = attrs.get('email')
         phone_number = attrs.get('phone_number')
         password = attrs.get('password')
@@ -69,11 +70,9 @@ class LoginSerializer(serializers.Serializer):
         if not password:
             raise serializers.ValidationError({"detail": "Password is required"})
         
-       
         if email:
             user = authenticate(request=None, username=email, password=password)
         else:
-        
             try:
                 from .models import CustomUser
                 user_obj = CustomUser.objects.get(phone_number=phone_number)
@@ -85,9 +84,16 @@ class LoginSerializer(serializers.Serializer):
             raise serializers.ValidationError({"detail": "Invalid credentials"})
         if not user.is_active:
             raise serializers.ValidationError({"detail": "User account is disabled"})
-    
+        
+        refresh = RefreshToken.for_user(user)
+        tokens = {
+            'access': str(refresh.access_token),
+            'refresh': str(refresh)
+        }
         
         attrs['user'] = user
+        attrs['tokens'] = tokens
+        attrs['role'] = getattr(user, 'role', None)
         return attrs
 
 class UserSerializer(serializers.ModelSerializer):
@@ -127,25 +133,26 @@ class SendOTPSerializer(serializers.Serializer):
         default=False,
         help_text="Set to True if checking home_owner table instead of user table"
     )
+    is_forget_otp = serializers.BooleanField(
+        required=False,
+        default=False,
+        help_text="Set to True to check from database tables (for forget password). False to use cache (for pre-registration)."
+    )
 
     def validate(self, attrs):
         email = attrs.get('email')
         phone_number = attrs.get('phone_number')
         verification_type = attrs.get('verification_type')
         
-        # Check if at least one of email or phone_number is provided
         if not email and not phone_number:
             raise serializers.ValidationError({"non_field_errors": ["Either email or phone_number is required"]})
         
-        # If both are provided, require verification_type to specify which to use
         if email and phone_number and not verification_type:
             raise serializers.ValidationError({"verification_type": "verification_type is required when both email and phone_number are provided"})
-        
-        # If only email is provided, set verification_type to 'email'
+    
         if email and not phone_number:
             attrs['verification_type'] = 'email'
         
-        # If only phone_number is provided, set verification_type to 'phone_number'
         if phone_number and not email:
             attrs['verification_type'] = 'phone_number'
         
@@ -166,6 +173,11 @@ class OTPSerializer(serializers.Serializer):
         required=False,
         default=False,
         help_text="Set to True if verifying home_owner table instead of user table"
+    )
+    is_forget_otp = serializers.BooleanField(
+        required=False,
+        default=False,
+        help_text="Set to True to verify from database tables (for forget password). False to verify from cache (for pre-registration)."
     )
 
     def validate(self, attrs):

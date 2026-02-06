@@ -40,7 +40,6 @@ class QboxCreateSerializer(serializers.ModelSerializer):
         ]
 
     def create(self, validated_data):
-        # Handle homeowner field - convert UUID string to object if provided
         homeowner_uuid = validated_data.pop('homeowner', None)
         from home_owner.models import CustomHomeOwner
         
@@ -52,7 +51,6 @@ class QboxCreateSerializer(serializers.ModelSerializer):
                 pass
         
         qbox = Qbox.objects.create(homeowner=homeowner_obj, **validated_data)
-        # Sync with homeowner if assigned
         if qbox.homeowner:
             qbox.sync_with_homeowner(save=True)
         return qbox
@@ -85,4 +83,13 @@ class QboxStatusUpdateSerializer(serializers.Serializer):
 
 
 class VerifyQboxIdSerializer(serializers.Serializer):
-    qbox_id = serializers.CharField(required=True, max_length=20, help_text="Unique device identifier of the QBox")
+    qbox_id = serializers.CharField(required=False, max_length=20, help_text="Unique device identifier of the QBox")
+    
+    def validate(self, attrs):
+        qbox_id = attrs.get('qbox_id') or attrs.get('qbox-id')
+        
+        if not qbox_id:
+            raise serializers.ValidationError({"detail": "qbox_id is required"})
+        
+        attrs['qbox_id'] = qbox_id
+        return attrs

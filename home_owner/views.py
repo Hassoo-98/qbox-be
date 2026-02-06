@@ -297,17 +297,18 @@ class HomeOwnerResetPasswordView(generics.CreateAPIView):
     )
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
-        if serializer.is_valid(raise_exception=True):
-            user = serializer.validated_data['user']
-            new_password = serializer.validated_data['new_password']
-            
-            # Set the new password
-            user.set_password(new_password)
-            user.save()
-            
-            return Response({
-                "success": True,
-                "statusCode": status.HTTP_200_OK,
-                "data": None,
-                "message": "Password reset successfully"
-            }, status=status.HTTP_200_OK)
+        serializer.is_valid(raise_exception=True)
+        
+        user = serializer.validated_data['user']
+        new_password = serializer.validated_data['new_password']
+        
+        # Update the password using set_password (which properly hashes it)
+        user.set_password(new_password)
+        user.save(update_fields=['password'])
+        
+        return Response({
+            "success": True,
+            "statusCode": status.HTTP_200_OK,
+            "data": None,
+            "message": "Password reset successfully"
+        }, status=status.HTTP_200_OK)

@@ -4,6 +4,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import PageNumberPagination
 from rest_framework import filters
 from drf_yasg.utils import swagger_auto_schema
+from core.authentication import CookieJWTAuthentication
 from drf_yasg import openapi
 from .models import CustomStaff
 from .serializers import (
@@ -50,6 +51,7 @@ class StaffListAPIView(generics.ListAPIView):
     """
     queryset = CustomStaff.objects.all()
     serializer_class = StaffSerializer
+    authentication_classes = [CookieJWTAuthentication]
     permission_classes = [IsAuthenticated]
     pagination_class = StandardResultsPagination
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
@@ -74,7 +76,7 @@ class StaffListAPIView(generics.ListAPIView):
             openapi.Parameter("ordering", openapi.IN_QUERY, type=openapi.TYPE_STRING, description="Ordering field(s), e.g. name,-email"),
         ],
         responses={
-            200: create_paginated_response(  # ← use your helper if it exists, or get_wrapped_response_schema(...)
+            200: create_paginated_response(  
                 get_serializer_schema(StaffSerializer, many=True),
                 tag="Staff items"
             ),
