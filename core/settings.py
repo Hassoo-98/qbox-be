@@ -116,7 +116,7 @@ REDOC_SETTINGS = {
 }
 
 # Schema URL for drf_yasg
-SCHEMA_URL = 'http://backend.qbox.sa'
+# SCHEMA_URL = 'http://backend.qbox.sa'
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
