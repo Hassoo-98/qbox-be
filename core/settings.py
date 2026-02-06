@@ -10,14 +10,32 @@ SECRET_KEY = 'django-insecure-fxl=8mkb+!#g*5$1ui-q781htt@$$l$rtimq8vl*6khm3_(uja
 DEBUG = True
 APPEND_SLASH = False
 
-
-
+CROSS_ALLOW_CREDENTIALS=True
 ALLOWED_HOSTS = [
     "127.0.0.1",
     "localhost",
     ".ngrok-free.app",
 ]
+CSRF_TRUSTED_ORIGINS = [
+    "https://*.ngrok-free.app",
+    "http://localhost:5173",
+]
 
+
+# CORS Settings
+CORS_ALLOWED_ORIGINS = [
+    "http://127.0.0.1",
+    "https://.ngrok-free.app",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https://.*\.ngrok-free\.app$",
+]
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -25,6 +43,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    "corsheaders",
     'rest_framework',
     'django_filters',
     'accounts',
@@ -38,7 +57,9 @@ INSTALLED_APPS = [
     'drf_yasg'
 ]
 AUTH_USER_MODEL = 'accounts.CustomUser'
+SESSION_COOKIE_SAMESITE = None
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -49,7 +70,7 @@ MIDDLEWARE = [
 ]
 REST_FRAMEWORK={
     "DEFAULT_AUTHENTICATION_CLASSES":[
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "core.authentication.CookieJWTAuthentication",
         # 'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [

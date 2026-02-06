@@ -1,4 +1,4 @@
-from rest_framework import generics, status
+from rest_framework import generics, status,permissions
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import PageNumberPagination
@@ -21,10 +21,7 @@ from utils.swagger_schema import (
     NotFoundResponse,
     COMMON_RESPONSES,
 )
-
 swagger = SwaggerHelper(tag="QBox")
-
-
 class StandardResultsPagination(PageNumberPagination):
     page_size = 10
     page_size_query_param = "limit"
@@ -178,8 +175,6 @@ class QboxUpdateAPIView(generics.UpdateAPIView):
             "data": serializer.data,
             "message": "QBox updated successfully"
         }, status=status.HTTP_200_OK)
-
-
 class QboxStatusUpdateAPIView(generics.UpdateAPIView):
     '''
     Patch: Update QBox status
@@ -249,15 +244,16 @@ class QboxDeleteAPIView(generics.DestroyAPIView):
 
 class VerifyQboxIdAPIView(generics.CreateAPIView):
     """
-    Post: Verify QBox ID and assign it to the authenticated home owner
+    Post: Verify QBox ID
     """
     serializer_class = VerifyQboxIdSerializer
-    permission_classes = [IsAuthenticated]
-
+    permission_classes = [permissions.AllowAny]
+    
+    
     @swagger_auto_schema(
         **swagger.create_operation(
             summary="Verify QBox ID",
-            description="Verify a QBox device ID and assign it to the authenticated home owner. The QBox must exist in the system.",
+            description="Verify a QBox device ID. The QBox must exist in the system. No user assignment required.",
             serializer=VerifyQboxIdSerializer
         )
     )
@@ -265,20 +261,8 @@ class VerifyQboxIdAPIView(generics.CreateAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         
-        # Get authenticated home owner from request
-        home_owner = request.user
         qbox_id = serializer.validated_data['qbox_id']
         
-        # Check if the authenticated user is a home owner
-        if not isinstance(home_owner, CustomHomeOwner):
-            return Response({
-                "success": False,
-                "statusCode": status.HTTP_403_FORBIDDEN,
-                "data": None,
-                "message": "Only home owners can verify QBox ID"
-            }, status=status.HTTP_403_FORBIDDEN)
-        
-        # Find the QBox
         try:
             qbox = Qbox.objects.get(qbox_id=qbox_id)
         except Qbox.DoesNotExist:
@@ -289,23 +273,9 @@ class VerifyQboxIdAPIView(generics.CreateAPIView):
                 "message": "QBox with this ID not found"
             }, status=status.HTTP_404_NOT_FOUND)
         
-        # Check if QBox is already assigned to another home owner
-        if qbox.homeowner and qbox.homeowner.id != home_owner.id:
-            return Response({
-                "success": False,
-                "statusCode": status.HTTP_400_BAD_REQUEST,
-                "data": None,
-                "message": "QBox is already assigned to another home owner"
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Assign QBox to home owner
-        qbox.homeowner = home_owner
-        qbox.sync_with_homeowner(save=True)
-        qbox.save()
-        
         return Response({
             "success": True,
             "statusCode": status.HTTP_200_OK,
-            "data": QboxSerializer(qbox).data,
-            "message": "QBox verified and assigned successfully"
+            "data":None,
+            "message": "QBox verified successfully"
         }, status=status.HTTP_200_OK)

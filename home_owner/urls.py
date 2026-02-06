@@ -9,7 +9,6 @@ from .views import (
     HomeOwnerLoginView,
     HomeOwnerResetPasswordView,
 )
-
 urlpatterns = [
     path("/login", HomeOwnerLoginView.as_view(), name="homeowner-login"),
     path("/reset-password", HomeOwnerResetPasswordView.as_view(), name="homeowner-reset-password"),
