@@ -26,14 +26,14 @@ schema_view = get_schema_view(
 urlpatterns = [
   
     path("admin/", admin.site.urls),
-    path("api/auth", include("accounts.urls")),
-    path("api/staff", include("staff.urls")),
-    path("api/driver", include("driver.urls")),
-    path("api/home_owner", include("home_owner.urls")),
-    path("api/qbox", include("q_box.urls")),
-    path("api/packages", include("packages.urls")),
-    path("api/service_provider", include("service_provider.urls")),
-    path("api/locations", include("locations.urls")),
+    path("auth/", include("accounts.urls")),
+    path("staff/", include("staff.urls")),
+    path("driver/", include("driver.urls")),
+    path("home_owner/", include("home_owner.urls")),
+    path("qbox/", include("q_box.urls")),
+    path("packages/", include("packages.urls")),
+    path("service_provider/", include("service_provider.urls")),
+    path("locations/", include("locations.urls")),
     # Swagger URLs
      path("swagger", lambda request: redirect("/swagger/")),
     path("swagger/", schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
