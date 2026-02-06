@@ -20,7 +20,7 @@ ALLOWED_HOSTS = [
 CSRF_TRUSTED_ORIGINS = [
     "https://*.ngrok-free.app",
     "http://localhost:5173",
-    "http://backend.qbox.sa/"
+    "http://backend.qbox.sa"
 ]
 
 
@@ -32,7 +32,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:5173",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-      "http://backend.qbox.sa/"
+      "http://backend.qbox.sa"
 ]
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_ALL_ORIGINS = False
@@ -95,7 +95,7 @@ SWAGGER_SETTINGS = {
     },
      "USE_SESSION_AUTH": False,
     'DEFAULT_AUTO_SCHEMA_CLASS': 'drf_yasg.inspectors.SwaggerAutoSchema',
-    'DEFAULT_API_URL': '/',
+    'DEFAULT_API_URL': '/api',
     'OPERATIONS_SORTER': 'method',
     'TAGS_SORTER': 'alpha',
     'APIS_SORTER': 'alpha',
@@ -116,12 +116,13 @@ REDOC_SETTINGS = {
 }
 
 # Schema URL for drf_yasg
-SCHEMA_URL = 'http://backend.qbox.sa/'
+SCHEMA_URL = 'http://backend.qbox.sa'
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
 }
+FORCE_SCRIPT_NAME = '/api'
 
 ROOT_URLCONF = 'core.urls'
 TEMPLATES = [
@@ -208,4 +209,5 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
