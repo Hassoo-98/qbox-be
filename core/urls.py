@@ -10,16 +10,15 @@ from django.conf.urls.static import static
 schema_view = get_schema_view(
     openapi.Info(
         title="Qbox API",
+        default_version="v1",
         description="Qbox backend API documentation",
-        default_version='v1',
-        terms_of_service="https://www.google.com/policies/terms/",
         contact=openapi.Contact(email="support@qbox.com"),
         license=openapi.License(name="BSD License"),
     ),
     public=True,
     permission_classes=(permissions.AllowAny,),
-    url='http://backend.qbox.sa',
 )
+
 
 
 
@@ -35,10 +34,12 @@ urlpatterns = [
     path("service_provider/", include("service_provider.urls")),
     path("locations/", include("locations.urls")),
     # Swagger URLs
-     path("swagger", lambda request: redirect("/swagger/")),
+
+    path("swagger", lambda request: redirect("/swagger/")),
     path("swagger/", schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
-    re_path(r'^redoc/$', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
-    re_path(r'^swagger/schema/$', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger'),
+    path("swagger/schema.json", schema_view.without_ui(cache_timeout=0), name='schema-json'),
+    path("redoc/", schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
+
 ]
 
 if settings.DEBUG:
