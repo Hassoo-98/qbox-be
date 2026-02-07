@@ -129,6 +129,8 @@ class QboxAccessQRCodeCreateSerializer(serializers.Serializer):
 
     def create(self, validated_data):
         import secrets
+        from io import BytesIO
+        from django.core.files import File
         
         qbox = validated_data.pop('qbox')
         qbox_id = validated_data.pop('qbox_id')  # Remove qbox_id as it's not a model field
@@ -145,6 +147,40 @@ class QboxAccessQRCodeCreateSerializer(serializers.Serializer):
             access_token=access_token,
             **validated_data
         )
+        
+        # Generate and save QR code image
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=10,
+            border=4,
+        )
+        
+        # QR code data contains comprehensive information for display
+        qr_data = {
+            "qbox_id": qbox.qbox_id,
+            "qr_name": qr_code.name,
+            "location": qr_code.location,
+            "short_address": qbox.short_address_snapshot,
+            "city": qbox.city_snapshot,
+            "max_users": qr_code.max_users,
+            "valid_duration": f"{qr_code.valid_duration} {qr_code.duration_type}",
+            "qbox_image": qbox.qbox_image if qbox.qbox_image else None,
+            "expires_at": qr_code.expires_at.isoformat() if qr_code.expires_at else None
+        }
+        qr.add_data(str(qr_data))
+        qr.make(fit=True)
+        
+        img = qr.make_image(fill_color="black", back_color="white")
+        buffer = BytesIO()
+        img.save(buffer, format='PNG')
+        buffer.seek(0)
+        
+        # Save QR code image to model
+        filename = f"qrcode_{qr_code.id}.png"
+        qr_code.qr_code_image.save(filename, File(buffer), save=True)
+        qr_code.qr_code_url = qr_code.qr_code_image.url
+        qr_code.save(update_fields=['qr_code_url'])
         
         return qr_code
 
@@ -182,7 +218,9 @@ class QboxAccessQRCodeSerializer(serializers.ModelSerializer):
         return obj.get_expires_in()
     
     def get_qr_code_image(self, obj):
-        """Generate QR code image URL"""
+        """Generate and return full QR code image URL"""
+        from django.conf import settings
+        
         if obj.qr_code_url:
             return obj.qr_code_url
         
@@ -220,7 +258,7 @@ class QboxAccessQRCodeSerializer(serializers.ModelSerializer):
         obj.qr_code_url = obj.qr_code_image.url
         obj.save(update_fields=['qr_code_url', 'qr_code_image'])
         
-        return obj.qr_code_image.url
+        return obj.qr_code_url
 
 
 class QboxAccessQRCodeListSerializer(serializers.ModelSerializer):
