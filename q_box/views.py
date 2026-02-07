@@ -298,7 +298,7 @@ class QboxAccessQRCodeListAPIView(generics.ListAPIView):
     """
     queryset = QboxAccessQRCode.objects.all()
     serializer_class = QboxAccessQRCodeListSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
     pagination_class = StandardResultsPagination
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["name", "location"]
@@ -359,8 +359,8 @@ class QboxAccessQRCodeCreateAPIView(generics.CreateAPIView):
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
-        # Get the homeowner from the request
-        context['homeowner'] = self.request.user
+        # Get the homeowner from the request (if authenticated)
+        context['homeowner'] = getattr(self.request, 'user', None)
         return context
 
     @swagger_auto_schema(
@@ -453,6 +453,7 @@ class QboxAccessQRCodeAccessAPIView(generics.CreateAPIView):
     """
     serializer_class = QboxAccessRequestSerializer
     permission_classes = [permissions.AllowAny]
+    
 
     @swagger_auto_schema(
         tags=["QBox QR Code"],
