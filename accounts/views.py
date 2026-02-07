@@ -443,100 +443,107 @@ class VerifyEmailView(APIView):
             }, status=status.HTTP_400_BAD_REQUEST)
 
 
-class OTPVerificationView(generics.CreateAPIView):
+class OTPVerificationView(APIView):
     """
     Verify user OTP sent to email or phone
     """
-    serializer_class = OTPSerializer
     permission_classes = [permissions.AllowAny]
 
     @swagger_auto_schema(
-        **swagger.create_operation(
-            summary="Verify OTP",
-            description="Verify user OTP sent to email or phone. Requires email or phone_number and OTP. Set is_home_owner=true to verify home_owner table instead of user table.",
-            serializer=OTPSerializer
-        )
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'otp': openapi.Schema(type=openapi.TYPE_STRING, description='OTP code'),
+                'email': openapi.Schema(type=openapi.TYPE_STRING, description='Email address'),
+                'phone_number': openapi.Schema(type=openapi.TYPE_STRING, description='Phone number'),
+                'is_home_owner': openapi.Schema(type=openapi.TYPE_BOOLEAN, description='Set to True for home_owner table'),
+                'is_forget_otp': openapi.Schema(type=openapi.TYPE_BOOLEAN, description='Set to True to verify from database'),
+            },
+            required=['otp']
+        ),
+        operation_summary="Verify OTP",
+        operation_description="Verify OTP. If is_forget_otp=true, validates against database. Otherwise, skips validation for pre-registration.",
+        tags=["Authentication"]
     )
-    def post(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        
-        email = serializer.validated_data.get('email')
-        phone_number = serializer.validated_data.get('phone_number')
-        otp = serializer.validated_data['otp']
-        is_home_owner = serializer.validated_data.get('is_home_owner', False)
+    def post(self, request):
+        otp = request.data.get('otp')
+        email = request.data.get('email')
+        phone_number = request.data.get('phone_number')
+        is_home_owner = request.data.get('is_home_owner', False)
+        is_forget_otp = request.data.get('is_forget_otp', False)
         
         # Test OTP for development/testing
         TEST_OTP = "555555"
         
-        try:
-            if is_home_owner:
-                if email:
-                    user = CustomHomeOwner.objects.get(email=email)
+        # If is_forget_otp is true, search for user in database
+        user = None
+        if is_forget_otp:
+            try:
+                if is_home_owner:
+                    if email:
+                        user = CustomHomeOwner.objects.get(email=email)
+                    elif phone_number:
+                        user = CustomHomeOwner.objects.get(phone_number=phone_number)
                 else:
-                    user = CustomHomeOwner.objects.get(phone_number=phone_number)
-            else:
-                if email:
-                    user = CustomUser.objects.get(email=email)
-                else:
-                    user = CustomUser.objects.get(phone_number=phone_number)
-        except (CustomUser.DoesNotExist, CustomHomeOwner.DoesNotExist):
-            return Response({
-                "success": False,
-                "statusCode": status.HTTP_400_BAD_REQUEST,
-                "data": None,
-                "message": "Invalid user"
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Skip OTP validation for test OTP
-        if otp != TEST_OTP:
-            if is_home_owner:
-                otp_field = user.password_reset_otp
-                otp_expires_field = user.password_reset_otp_expires
-            else:
-                otp_field = user.reset_password_token
-                otp_expires_field = user.reset_password_token_expires
-            
-            if otp_field != otp:
+                    if email:
+                        user = CustomUser.objects.get(email=email)
+                    elif phone_number:
+                        user = CustomUser.objects.get(phone_number=phone_number)
+            except (CustomUser.DoesNotExist, CustomHomeOwner.DoesNotExist):
                 return Response({
                     "success": False,
                     "statusCode": status.HTTP_400_BAD_REQUEST,
                     "data": None,
-                    "message": "Invalid OTP"
+                    "message": "User not found"
                 }, status=status.HTTP_400_BAD_REQUEST)
             
-            if otp_expires_field and otp_expires_field < timezone.now():
-                return Response({
-                    "success": False,
-                    "statusCode": status.HTTP_400_BAD_REQUEST,
-                    "data": None,
-                    "message": "OTP has expired"
-                }, status=status.HTTP_400_BAD_REQUEST)
+            # Skip OTP validation for test OTP
+            if otp != TEST_OTP:
+                if is_home_owner:
+                    otp_field = user.password_reset_otp
+                    otp_expires_field = user.password_reset_otp_expires
+                else:
+                    otp_field = user.reset_password_token
+                    otp_expires_field = user.reset_password_token_expires
+                
+                if otp_field != otp:
+                    return Response({
+                        "success": False,
+                        "statusCode": status.HTTP_400_BAD_REQUEST,
+                        "data": None,
+                        "message": "Invalid OTP"
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                
+                if otp_expires_field and otp_expires_field < timezone.now():
+                    return Response({
+                        "success": False,
+                        "statusCode": status.HTTP_400_BAD_REQUEST,
+                        "data": None,
+                        "message": "OTP has expired"
+                    }, status=status.HTTP_400_BAD_REQUEST)
         
-        user.email_verified = True
-        
-        if is_home_owner:
-            user.is_verified = True
-        
-        # Clear OTP fields
-        if is_home_owner:
-            user.password_reset_otp = None
-            user.password_reset_otp_expires = None
-        else:
-            user.reset_password_token = None
-            user.reset_password_token_expires = None
-        user.save()
-        
-        # Use appropriate serializer based on user type
-        if is_home_owner:
-            serializer = HomeOwnerSerializer(user)
-        else:
-            serializer = UserSerializer(user)
+        # If user was found and verified, update their status
+        if user:
+            user.email_verified = True
+            if is_home_owner:
+                user.is_verified = True
+            
+            # Clear OTP fields
+            if is_home_owner:
+                user.password_reset_otp = None
+                user.password_reset_otp_expires = None
+            else:
+                user.reset_password_token = None
+                user.reset_password_token_expires = None
+            user.save()
         
         return Response({
             "success": True,
             "statusCode": status.HTTP_200_OK,
-            "data":None,
+            "data": {
+                "otp": otp,
+                "verified": True
+            },
             "message": "OTP verified successfully"
         }, status=status.HTTP_200_OK)
 
