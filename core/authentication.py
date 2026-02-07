@@ -6,11 +6,14 @@ User = get_user_model()
 
 class CookieJWTAuthentication(JWTAuthentication):
     def authenticate(self, request):
-        auth_header = request.headers.get('Authorization') or request.headers.get('authorization')
-        if auth_header and auth_header.startswith('Bearer '):
-            token = auth_header[7:]
-        else:
-            token = request.COOKIES.get("access_token")
+        # First, try to get token from cookies
+        token = request.COOKIES.get("access_token")
+        
+        # If not found in cookies, try Authorization header
+        if not token:
+            auth_header = request.headers.get('Authorization') or request.headers.get('authorization')
+            if auth_header and auth_header.startswith('Bearer '):
+                token = auth_header[7:]
         
         if not token:
             return None
