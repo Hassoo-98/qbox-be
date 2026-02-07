@@ -7,6 +7,7 @@ from django.conf import settings
 from django.utils.http import urlsafe_base64_decode
 from django.utils.encoding import force_str
 from django.utils import timezone
+from django.http import HttpRequest
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from rest_framework import generics, status, permissions,viewsets
@@ -37,6 +38,16 @@ from utils.swagger_schema import (
     COMMON_RESPONSES,
 )
 
+# Get protocol and domain from settings or request
+def get_protocol_and_domain(request=None):
+    if request:
+        protocol = 'https' if request.is_secure() else 'http'
+        domain = request.get_host()
+    else:
+        protocol = getattr(settings, 'PROTOCOL', 'http')
+        domain = getattr(settings, 'DOMAIN', 'localhost:8000')
+    return protocol, domain
+
 # Swagger Helper for Authentication
 swagger = SwaggerHelper(tag="Authentication")
 
@@ -62,11 +73,14 @@ class RegisterView(generics.CreateAPIView):
             user = serializer.save()
             token = default_token_generator.make_token(user)
             uidb64 = urlsafe_base64_encode(force_bytes(user.pk))
+            protocol, domain = get_protocol_and_domain(request)
             subject = 'Verify your email'
             message = render_to_string('verification_email.html', {
                 'user': user,
                 'uidb64': uidb64,
                 'token': token,
+                'protocol': protocol,
+                'domain': domain,
             })
             try:
                 send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [user.email])
@@ -81,7 +95,7 @@ class RegisterView(generics.CreateAPIView):
             return Response({
                 "success": True,
                 "statusCode": status.HTTP_201_CREATED,
-                "data":user.data,
+                "data": UserSerializer(user).data,
                 "message": "User registered successfully. Please check your email to verify your account."
             }, status=status.HTTP_201_CREATED)
 
@@ -105,17 +119,40 @@ class LoginView(generics.CreateAPIView):
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid(raise_exception=True):
             user = serializer.validated_data['user']
+            role = serializer.validated_data.get('role', None)
             refresh = RefreshToken.for_user(user)
-            return Response({
-                "success": True,
-                "statusCode": status.HTTP_200_OK,
-                "data": {
-                    "refresh": str(refresh),
-                    "access": str(refresh.access_token),
-                    "user": UserSerializer(user).data
-                },
-                "message": "Login successful"
-            }, status=status.HTTP_200_OK)
+            tokens = {
+                'access': str(refresh.access_token),
+                'refresh': str(refresh)
+                  }
+            response = Response({
+            "success": True,
+            "statusCode": status.HTTP_200_OK,
+            "data": {
+                "user": UserSerializer(user).data,
+                "tokens": tokens,
+                "role": role
+            },
+            "message": "Login successful"
+        }, status=status.HTTP_200_OK)
+        
+        response.set_cookie(
+            key='access_token',
+            value=str(refresh.access_token),
+            httponly=True,
+            secure=True,
+            samesite='strict',
+            max_age=24*60*60
+        )
+        response.set_cookie(
+            key='refresh_token',
+            value=str(refresh),
+            httponly=True,
+            secure=True,
+            samesite="strict",
+            max_age=7*24*60*60
+        )
+        return response
 
 
 class UserProfileView(generics.RetrieveUpdateAPIView):
@@ -211,11 +248,14 @@ class PasswordResetRequestView(generics.CreateAPIView):
             user = CustomUser.objects.get(email=email)
             token = default_token_generator.make_token(user)
             uidb64 = urlsafe_base64_encode(force_bytes(user.pk))
+            protocol, domain = get_protocol_and_domain(request)
             subject = 'Password Reset Request'
             message = render_to_string('password_reset_email.html', {
                 'user': user,
                 'uidb64': uidb64,
                 'token': token,
+                'protocol': protocol,
+                'domain': domain,
             })
             send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [user.email])
         except CustomUser.DoesNotExist:
@@ -499,7 +539,7 @@ class SendOTPView(generics.CreateAPIView):
         verification_type = serializer.validated_data['verification_type']
         is_home_owner = serializer.validated_data.get('is_home_owner', False)
         
-        # Find user by email or phone_number based on verification_type and is_home_owner
+        
         try:
             if is_home_owner:
                 if verification_type == 'email':
@@ -511,13 +551,27 @@ class SendOTPView(generics.CreateAPIView):
                     user = CustomUser.objects.get(email=email)
                 else:
                     user = CustomUser.objects.get(phone_number=phone_number)
-        except (CustomUser.DoesNotExist, CustomHomeOwner.DoesNotExist):
-            return Response({
-                "success": False,
-                "statusCode": status.HTTP_404_NOT_FOUND,
-                "data": None,
-                "message": "User with this email or phone number does not exist"
-            }, status=status.HTTP_404_NOT_FOUND)
+        except CustomUser.DoesNotExist:
+            if is_home_owner:
+                # If is_home_owner=True but user not found in CustomHomeOwner
+                pass
+            else:
+                return Response({
+                    "success": False,
+                    "statusCode": status.HTTP_404_NOT_FOUND,
+                    "data": None,
+                    "message": "User with this email or phone number does not exist"
+                }, status=status.HTTP_404_NOT_FOUND)
+        except CustomHomeOwner.DoesNotExist:
+            if is_home_owner:
+                return Response({
+                    "success": False,
+                    "statusCode": status.HTTP_404_NOT_FOUND,
+                    "data": None,
+                    "message": "Home owner with this email or phone number does not exist"
+                }, status=status.HTTP_404_NOT_FOUND)
+            else:
+                pass
         
         otp = ''.join([str(random.randint(0, 9)) for _ in range(6)])
         
