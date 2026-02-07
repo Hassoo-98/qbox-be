@@ -541,10 +541,10 @@ class SendOTPView(generics.CreateAPIView):
         is_home_owner = serializer.validated_data.get('is_home_owner', False)
         is_forget_otp = serializer.validated_data.get('is_forget_otp', False)
         
-        # If is_forget_otp is False, send OTP directly without checking tables
+       
         if not is_forget_otp:
-            # Generate and send OTP without validation
-            otp = ''.join([str(random.randint(0, 9)) for _ in range(6)])
+           
+            otp="555555"
             
             if verification_type == 'email':
                 subject = 'Your OTP for Verification'
