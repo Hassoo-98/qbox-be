@@ -160,8 +160,8 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
     Get or update current user's profile
     """
     serializer_class = UserProfileSerializer
-    authentication_classes = [JWTAuthentication]
-    permission_classes = [permissions.IsAuthenticated]
+    authentication_classes = []
+    permission_classes = [JWTAuthentication]
 
     def get_object(self):
         return self.request.user
