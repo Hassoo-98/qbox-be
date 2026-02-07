@@ -15,12 +15,13 @@ class InstallationSerializer(serializers.Serializer):
     """Serializer for installation details during home owner creation"""
     location_preference = serializers.CharField(required=True, max_length=255, help_text="Preferred location for QBox installation")
     access_instruction = serializers.CharField(required=True, max_length=500, help_text="Instructions for accessing the installation location")
-    qbox_image_url = serializers.CharField(required=True, help_text="URL or file path of QBox image")
+    qbox_image_url = serializers.FileField(required=False, allow_null=True, help_text="QBox image file")
 
 
 class HomeOwnerSerializer(serializers.ModelSerializer):
     address = HomeOwnerAddressSerializer(read_only=True)
     qboxes = serializers.SerializerMethodField()
+    installation_qbox_image_url = serializers.SerializerMethodField()
 
     class Meta:
         model = CustomHomeOwner
@@ -35,6 +36,13 @@ class HomeOwnerSerializer(serializers.ModelSerializer):
     def get_qboxes(self, obj):
         from q_box.serializers import QboxListSerializer
         return QboxListSerializer(obj.qboxes.all(), many=True).data
+    
+    def get_installation_qbox_image_url(self, obj):
+        """Return full URL for the image"""
+        from django.conf import settings
+        if obj.installation_qbox_image_url:
+            return obj.installation_qbox_image_url.url
+        return None
 
 
 class HomeOwnerCreateSerializer(serializers.ModelSerializer):
@@ -65,7 +73,7 @@ class HomeOwnerCreateSerializer(serializers.ModelSerializer):
         if installation_data:
             installation_location_preference = installation_data.get('location_preference')
             installation_access_instruction = installation_data.get('access_instruction')
-            installation_qbox_image_url = installation_data.get('qbox_image_url')
+            installation_qbox_image = installation_data.get('qbox_image_url')
         
         user = CustomHomeOwner.objects.create_user(
             email=validated_data['email'],
@@ -74,13 +82,17 @@ class HomeOwnerCreateSerializer(serializers.ModelSerializer):
             password=validated_data['password'],
             installation_location_preference=installation_location_preference,
             installation_access_instruction=installation_access_instruction,
-            installation_qbox_image_url=installation_qbox_image_url,
             **{k: v for k, v in validated_data.items() if k not in [
                 'email', 'full_name', 'phone_number', 'password', 
                 'installation_location_preference', 'installation_access_instruction', 
                 'installation_qbox_image_url', 'qbox_id', 'address', 'installation'
             ]}
         )
+        
+        # Save the image file if provided
+        if installation_qbox_image:
+            user.installation_qbox_image_url = installation_qbox_image
+            user.save(update_fields=['installation_qbox_image_url'])
         
         if address_data:
             address = CustomHomeOwnerAddress.objects.create(**address_data)
@@ -92,7 +104,7 @@ class HomeOwnerCreateSerializer(serializers.ModelSerializer):
                 qbox = Qbox.objects.get(qbox_id=qbox_id)
                 if not qbox.homeowner:
                     qbox.homeowner = user
-                    qbox.qbox_image = installation_qbox_image_url
+                    qbox.qbox_image = user.installation_qbox_image_url.url if user.installation_qbox_image_url else None
                     qbox.sync_with_homeowner(save=True)
                     qbox.save()
             except Qbox.DoesNotExist:
