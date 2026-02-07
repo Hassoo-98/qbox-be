@@ -15,6 +15,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.tokens import RefreshToken
+from core.authentication import CookieJWTAuthentication
 from .models import CustomUser
 from home_owner.models import CustomHomeOwner
 from .serializers import (
@@ -160,8 +161,8 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
     Get or update current user's profile
     """
     serializer_class = UserProfileSerializer
-    authentication_classes = []
-    permission_classes = [JWTAuthentication]
+    authentication_classes = [CookieJWTAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_object(self):
         return self.request.user
@@ -202,7 +203,7 @@ class ChangePasswordView(generics.UpdateAPIView):
     Change current user's password
     """
     serializer_class = ChangePasswordSerializer
-    authentication_classes = [JWTAuthentication]
+    authentication_classes = [CookieJWTAuthentication]
     permission_classes = [permissions.IsAuthenticated]
     http_method_names = ['put']
 
@@ -299,7 +300,7 @@ class UserViewSet(viewsets.ModelViewSet):
     """
     queryset = CustomUser.objects.all()
     serializer_class = UserSerializer
-    authentication_classes = [JWTAuthentication]
+    authentication_classes = [CookieJWTAuthentication]
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
