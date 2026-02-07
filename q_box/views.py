@@ -44,7 +44,7 @@ class QboxListAPIView(generics.ListAPIView):
     '''
     queryset = Qbox.objects.all()
     serializer_class = QboxSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
     pagination_class = StandardResultsPagination
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["qbox_id", "homeowner_name_snapshot", "city_snapshot"]
@@ -99,7 +99,7 @@ class QboxCreateAPIView(generics.CreateAPIView):
     '''
     queryset = Qbox.objects.all()
     serializer_class = QboxCreateSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
 
     @swagger_auto_schema(
         **swagger.create_operation(
@@ -135,7 +135,7 @@ class QboxDetailAPIView(generics.RetrieveAPIView):
     '''
     queryset = Qbox.objects.all()
     serializer_class = QboxSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
     lookup_field = "id"
 
     @swagger_auto_schema(
@@ -162,7 +162,7 @@ class QboxUpdateAPIView(generics.UpdateAPIView):
     '''
     queryset = Qbox.objects.all()
     serializer_class = QboxSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
     lookup_field = "id"
 
     @swagger_auto_schema(
@@ -190,7 +190,7 @@ class QboxStatusUpdateAPIView(generics.UpdateAPIView):
     '''
     queryset = Qbox.objects.all()
     serializer_class = QboxStatusUpdateSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
     lookup_field = "id"
     http_method_names = ['patch']
 
@@ -230,7 +230,7 @@ class QboxDeleteAPIView(generics.DestroyAPIView):
     '''
     queryset = Qbox.objects.all()
     serializer_class = QboxSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
     lookup_field = "id"
 
     @swagger_auto_schema(
