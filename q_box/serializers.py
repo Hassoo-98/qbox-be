@@ -107,16 +107,16 @@ class QboxAccessQRCodeCreateSerializer(serializers.Serializer):
     """
     qbox_id = serializers.CharField(required=True, help_text="Qbox ID to generate QR code for")
     name = serializers.CharField(required=True, max_length=100, help_text="Name for this QR code (e.g., 'Morning shift entrance')")
-    location = serializers.CharField(required=True, max_length=200, help_text="Location description (e.g., 'Box Main Entrance')")
-    address = serializers.CharField(required=True, max_length=500, help_text="Full address")
-    max_users = serializers.IntegerField(required=False, default=5, min_value=1, help_text="Maximum number of users who can use this QR code")
+    location = serializers.CharField(required=False, max_length=200, default="", help_text="Location description (e.g., 'Box Main Entrance')")
+    address = serializers.CharField(required=False, max_length=500, default="", help_text="Full address")
+    max_users = serializers.IntegerField(required=True, default=5, min_value=1, help_text="Maximum number of users who can use this QR code")
     duration_type = serializers.ChoiceField(
-        required=False,
+        required=True,
         choices=QboxAccessQRCode.DurationType.choices,
         default=QboxAccessQRCode.DurationType.DAYS,
         help_text="Duration type: 'days' or 'minutes'"
     )
-    valid_duration = serializers.IntegerField(required=False, default=1, min_value=1, help_text="Duration value based on duration_type")
+    valid_duration = serializers.IntegerField(required=True, default=1, min_value=1, help_text="Duration value based on duration_type")
 
     def validate(self, attrs):
         qbox_id = attrs.get('qbox_id')
