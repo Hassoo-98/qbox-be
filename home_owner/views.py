@@ -130,7 +130,7 @@ class HomeOwnerDetailAPIView(generics.RetrieveAPIView):
     '''
     queryset = CustomHomeOwner.objects.all()
     serializer_class = HomeOwnerSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
     lookup_field = "id"
 
     @swagger_auto_schema(
@@ -157,7 +157,7 @@ class HomeOwnerUpdateAPIView(generics.UpdateAPIView):
     '''
     queryset = CustomHomeOwner.objects.all()
     serializer_class = HomeOwnerSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
     lookup_field = "id"
 
     @swagger_auto_schema(
@@ -187,7 +187,7 @@ class HomeOwnerStatusUpdateAPIView(generics.UpdateAPIView):
     '''
     queryset = CustomHomeOwner.objects.all()
     serializer_class = HomeOwnerStatusUpdateSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
     lookup_field = "id"
     http_method_names = ['patch']
 
@@ -227,7 +227,7 @@ class HomeOwnerDeleteAPIView(generics.DestroyAPIView):
     '''
     queryset = CustomHomeOwner.objects.all()
     serializer_class = HomeOwnerSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
     lookup_field = "id"
 
     @swagger_auto_schema(
