@@ -539,44 +539,83 @@ class SendOTPView(generics.CreateAPIView):
         phone_number = serializer.validated_data.get('phone_number')
         verification_type = serializer.validated_data['verification_type']
         is_home_owner = serializer.validated_data.get('is_home_owner', False)
+        is_forget_otp = serializer.validated_data.get('is_forget_otp', False)
         
+        # If is_forget_otp is False, send OTP directly without checking tables
+        if not is_forget_otp:
+            # Generate and send OTP without validation
+            otp = ''.join([str(random.randint(0, 9)) for _ in range(6)])
+            
+            if verification_type == 'email':
+                subject = 'Your OTP for Verification'
+                message = f'Your OTP is: {otp}. This OTP will expire in 10 minutes.'
+                try:
+                    send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [email])
+                except Exception as e:
+                    return Response({
+                        "success": False,
+                        "statusCode": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        "data": None,
+                        "message": f"Failed to send OTP email: {str(e)}"
+                    }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                
+                return Response({
+                    "success": True,
+                    "statusCode": status.HTTP_200_OK,
+                    "data": {
+                        "email": email,
+                        "verification_type": verification_type,
+                        "otp": otp,
+                        "message": f"OTP sent successfully to {verification_type}"
+                    },
+                    "message": "OTP sent successfully"
+                }, status=status.HTTP_200_OK)
+            
+            elif verification_type == 'phone_number':
+                return Response({
+                    "success": True,
+                    "statusCode": status.HTTP_200_OK,
+                    "data": {
+                        "phone_number": phone_number,
+                        "verification_type": verification_type,
+                        "otp": otp,
+                        "message": "OTP sent to phone number"
+                    },
+                    "message": "OTP sent successfully"
+                }, status=status.HTTP_200_OK)
         
-        try:
-            if is_home_owner:
+        # If is_forget_otp is True, check the appropriate table
+        user = None
+        if is_home_owner:
+            try:
                 if verification_type == 'email':
                     user = CustomHomeOwner.objects.get(email=email)
                 else:
                     user = CustomHomeOwner.objects.get(phone_number=phone_number)
-            else:
-                if verification_type == 'email':
-                    user = CustomUser.objects.get(email=email)
-                else:
-                    user = CustomUser.objects.get(phone_number=phone_number)
-        except CustomUser.DoesNotExist:
-            if is_home_owner:
-                # If is_home_owner=True but user not found in CustomHomeOwner
-                pass
-            else:
-                return Response({
-                    "success": False,
-                    "statusCode": status.HTTP_404_NOT_FOUND,
-                    "data": None,
-                    "message": "User with this email or phone number does not exist"
-                }, status=status.HTTP_404_NOT_FOUND)
-        except CustomHomeOwner.DoesNotExist:
-            if is_home_owner:
+            except CustomHomeOwner.DoesNotExist:
                 return Response({
                     "success": False,
                     "statusCode": status.HTTP_404_NOT_FOUND,
                     "data": None,
                     "message": "Home owner with this email or phone number does not exist"
                 }, status=status.HTTP_404_NOT_FOUND)
-            else:
-                pass
+        else:
+            try:
+                if verification_type == 'email':
+                    user = CustomUser.objects.get(email=email)
+                else:
+                    user = CustomUser.objects.get(phone_number=phone_number)
+            except CustomUser.DoesNotExist:
+                return Response({
+                    "success": False,
+                    "statusCode": status.HTTP_404_NOT_FOUND,
+                    "data": None,
+                    "message": "User with this email or phone number does not exist"
+                }, status=status.HTTP_404_NOT_FOUND)
         
+        # Generate OTP and save to user
         otp = ''.join([str(random.randint(0, 9)) for _ in range(6)])
         
-        # Save OTP based on user type
         if is_home_owner:
             user.password_reset_otp = otp
             user.password_reset_otp_expires = timezone.now() + timezone.timedelta(minutes=10)
@@ -586,7 +625,7 @@ class SendOTPView(generics.CreateAPIView):
         user.save()
         
         if verification_type == 'email':
-            subject = 'Your OTP for Email Verification'
+            subject = 'Your OTP for Password Reset'
             message = f'Your OTP is: {otp}. This OTP will expire in 10 minutes.'
             try:
                 send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [user.email])
@@ -604,21 +643,20 @@ class SendOTPView(generics.CreateAPIView):
                 "data": {
                     "email": user.email,
                     "verification_type": verification_type,
-                    "message": f"OTP sent successfully to {verification_type}",
-                    "otp":otp
+                    "otp": otp,
+                    "message": f"OTP sent successfully to {verification_type}"
                 },
                 "message": "OTP sent successfully"
             }, status=status.HTTP_200_OK)
         
         elif verification_type == 'phone_number':
-           
             return Response({
                 "success": True,
                 "statusCode": status.HTTP_200_OK,
                 "data": {
                     "phone_number": user.phone_number,
                     "verification_type": verification_type,
-                    "otp": otp,  
+                    "otp": otp,
                     "message": "OTP sent to phone number"
                 },
                 "message": "OTP sent successfully"
