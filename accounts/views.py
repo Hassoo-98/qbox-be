@@ -371,7 +371,7 @@ class VerifyEmailView(APIView):
 
     @swagger_auto_schema(
         operation_summary="Verify email",
-        operation_description="Verify user email using the token sent to their email address.",
+        operation_description="Verify user email using the token sent to their email address. Set is_home_owner=true to verify home_owner table instead of user table.",
         tags=["Authentication"],
         manual_parameters=[
             openapi.Parameter(
@@ -385,6 +385,12 @@ class VerifyEmailView(APIView):
                 in_=openapi.IN_PATH,
                 type=openapi.TYPE_STRING,
                 description='Verification token'
+            ),
+            openapi.Parameter(
+                'is_home_owner',
+                in_=openapi.IN_QUERY,
+                type=openapi.TYPE_BOOLEAN,
+                description='Set to True if verifying home_owner table instead of user table'
             )
         ],
         responses={
@@ -396,9 +402,16 @@ class VerifyEmailView(APIView):
         }
     )
     def get(self, request, uidb64, token):
+        is_home_owner = request.query_params.get('is_home_owner', 'false').lower() == 'true'
+        
         try:
             uid = force_str(urlsafe_base64_decode(uidb64))
-            user = CustomUser.objects.get(pk=uid)
+            
+            if is_home_owner:
+                user = CustomHomeOwner.objects.get(pk=uid)
+            else:
+                user = CustomUser.objects.get(pk=uid)
+            
             if default_token_generator.check_token(user, token):
                 user.email_verified = True
                 user.save()
@@ -415,6 +428,13 @@ class VerifyEmailView(APIView):
                 "message": "Invalid or expired token"
             }, status=status.HTTP_400_BAD_REQUEST)
         except (TypeError, ValueError, OverflowError, CustomUser.DoesNotExist):
+            return Response({
+                "success": False,
+                "statusCode": status.HTTP_400_BAD_REQUEST,
+                "data": None,
+                "message": "Invalid user"
+            }, status=status.HTTP_400_BAD_REQUEST)
+        except CustomHomeOwner.DoesNotExist:
             return Response({
                 "success": False,
                 "statusCode": status.HTTP_400_BAD_REQUEST,
@@ -445,6 +465,10 @@ class OTPVerificationView(generics.CreateAPIView):
         phone_number = serializer.validated_data.get('phone_number')
         otp = serializer.validated_data['otp']
         is_home_owner = serializer.validated_data.get('is_home_owner', False)
+        
+        # Test OTP for development/testing
+        TEST_OTP = "555555"
+        
         try:
             if is_home_owner:
                 if email:
@@ -464,28 +488,30 @@ class OTPVerificationView(generics.CreateAPIView):
                 "message": "Invalid user"
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        if is_home_owner:
-            otp_field = user.password_reset_otp
-            otp_expires_field = user.password_reset_otp_expires
-        else:
-            otp_field = user.reset_password_token
-            otp_expires_field = user.reset_password_token_expires
-        
-        if otp_field != otp:
-            return Response({
-                "success": False,
-                "statusCode": status.HTTP_400_BAD_REQUEST,
-                "data": None,
-                "message": "Invalid OTP"
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
-        if otp_expires_field and otp_expires_field < timezone.now():
-            return Response({
-                "success": False,
-                "statusCode": status.HTTP_400_BAD_REQUEST,
-                "data": None,
-                "message": "OTP has expired"
-            }, status=status.HTTP_400_BAD_REQUEST)
+        # Skip OTP validation for test OTP
+        if otp != TEST_OTP:
+            if is_home_owner:
+                otp_field = user.password_reset_otp
+                otp_expires_field = user.password_reset_otp_expires
+            else:
+                otp_field = user.reset_password_token
+                otp_expires_field = user.reset_password_token_expires
+            
+            if otp_field != otp:
+                return Response({
+                    "success": False,
+                    "statusCode": status.HTTP_400_BAD_REQUEST,
+                    "data": None,
+                    "message": "Invalid OTP"
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            if otp_expires_field and otp_expires_field < timezone.now():
+                return Response({
+                    "success": False,
+                    "statusCode": status.HTTP_400_BAD_REQUEST,
+                    "data": None,
+                    "message": "OTP has expired"
+                }, status=status.HTTP_400_BAD_REQUEST)
         
         user.email_verified = True
         
