@@ -27,13 +27,9 @@ class CookieJWTAuthentication(JWTAuthentication):
         user_id = validated_token.get('user_id')
         if user_id is None:
             return None
-            
         try:
-            # Try to get user by id (handles both int and UUID)
             user = User._default_manager.get(pk=user_id)
         except (User.DoesNotExist, ValueError):
-            # ValueError happens when UUID string is passed to integer field
-            # Try to get by UUID
             try:
                 user = User._default_manager.get(id=user_id)
             except (User.DoesNotExist, ValueError):

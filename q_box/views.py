@@ -355,7 +355,7 @@ class QboxAccessQRCodeCreateAPIView(generics.CreateAPIView):
     Post: Create a new access QR code for a Qbox
     """
     serializer_class = QboxAccessQRCodeCreateSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
@@ -390,7 +390,7 @@ class QboxAccessQRCodeDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
     """
     queryset = QboxAccessQRCode.objects.all()
     serializer_class = QboxAccessQRCodeSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
     lookup_field = "id"
 
     def get_serializer_class(self):
@@ -549,7 +549,7 @@ class QboxAccessUsersListAPIView(generics.ListAPIView):
     Get: List users who have accessed via a QR code
     """
     serializer_class = QboxAccessUserSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
     pagination_class = StandardResultsPagination
 
     def get_queryset(self):
@@ -599,7 +599,7 @@ class QboxAccessQRCodeHistoryAPIView(generics.ListAPIView):
     """
     queryset = QboxAccessQRCode.objects.all()
     serializer_class = QboxAccessQRCodeHistorySerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
     pagination_class = StandardResultsPagination
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["qbox__qbox_id", "name", "qbox__homeowner_name_snapshot"]
@@ -621,7 +621,7 @@ class QboxAccessQRCodeStatusUpdateAPIView(generics.UpdateAPIView):
     """
     queryset = QboxAccessQRCode.objects.all()
     serializer_class = QboxAccessQRCodeStatusUpdateSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
     lookup_field = "id"
 
     @swagger_auto_schema(

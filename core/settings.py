@@ -22,6 +22,7 @@ CSRF_TRUSTED_ORIGINS = [
     "http://localhost:5173",
     "http://backend.qbox.sa"
 ]
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -135,6 +136,10 @@ REDOC_SETTINGS = {
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'AUTH_COOKIE_SECURE': True,
+    'AUTH_COOKIE_HTTPONLY': True,
+    'AUTH_COOKIE_SAMESITE': 'none', 
+    'AUTH_COOKIE_DOMAIN': 'backend.qbox.sa',
 }
 FORCE_SCRIPT_NAME = '/api'
 
