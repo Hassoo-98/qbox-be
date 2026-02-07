@@ -301,8 +301,6 @@ class HomeOwnerResetPasswordView(generics.CreateAPIView):
         
         user = serializer.validated_data['user']
         new_password = serializer.validated_data['new_password']
-        
-        # Update the password using set_password (which properly hashes it)
         user.set_password(new_password)
         user.save(update_fields=['password'])
         
