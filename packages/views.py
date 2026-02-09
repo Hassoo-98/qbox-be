@@ -1,4 +1,4 @@
-from rest_framework import generics, status
+from rest_framework import generics, status, permissions
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import PageNumberPagination
@@ -37,7 +37,7 @@ class PackageListAPIView(generics.ListAPIView):
     '''
     queryset = Package.objects.all()
     serializer_class = PackageSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
     pagination_class = StandardResultsPagination
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["tracking_id", "merchant_name", "service_provider", "driver_name"]
@@ -91,7 +91,7 @@ class PackageCreateAPIView(generics.CreateAPIView):
     '''
     queryset = Package.objects.all()
     serializer_class = PackageCreateSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
 
     @swagger_auto_schema(
         **swagger.create_operation(
@@ -154,7 +154,7 @@ class PackageUpdateAPIView(generics.UpdateAPIView):
     '''
     queryset = Package.objects.all()
     serializer_class = PackageSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
     lookup_field = "id"
 
     @swagger_auto_schema(
@@ -184,7 +184,7 @@ class PackageStatusUpdateAPIView(generics.UpdateAPIView):
     '''
     queryset = Package.objects.all()
     serializer_class = PackageStatusUpdateSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
     lookup_field = "id"
     http_method_names = ['patch']
 
@@ -224,7 +224,7 @@ class PackageDeleteAPIView(generics.DestroyAPIView):
     '''
     queryset = Package.objects.all()
     serializer_class = PackageSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
     lookup_field = "id"
 
     @swagger_auto_schema(
