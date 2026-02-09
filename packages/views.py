@@ -127,7 +127,7 @@ class PackageDetailAPIView(generics.RetrieveAPIView):
     '''
     queryset = Package.objects.all()
     serializer_class = PackageSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
     lookup_field = "id"
 
     @swagger_auto_schema(
