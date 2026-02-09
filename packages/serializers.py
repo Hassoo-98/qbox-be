@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import Package, PackageDetails
+import uuid
 
 class PackageDetailsSerializer(serializers.ModelSerializer):
     class Meta:
@@ -38,8 +39,15 @@ class PackageCreateSerializer(serializers.ModelSerializer):
             "service_provider", "driver_name", "qr_code",
             "package_status", "shipment_status", "details"
         ]
+        extra_kwargs = {
+            "tracking_id": {"required": False, "allow_blank": True}
+        }
 
     def create(self, validated_data):
+        # Auto-generate tracking_id if not provided
+        if not validated_data.get('tracking_id'):
+            validated_data['tracking_id'] = f"TRK-{str(uuid.uuid4())[:8].upper()}"
+        
         details_data = validated_data.pop('details', None)
         package = Package.objects.create(**validated_data)
         
