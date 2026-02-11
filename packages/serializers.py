@@ -184,3 +184,89 @@ class PackageStatusUpdateSerializer(serializers.Serializer):
                 })
         
         return data
+
+
+class SendPackageSerializer(serializers.Serializer):
+    """Serializer for creating a Send Package"""
+    shipping_company = serializers.CharField(max_length=100, required=True)
+    qbox_image = serializers.URLField(required=True)
+    package_description = serializers.CharField(required=True)
+    package_item_value = serializers.DecimalField(max_digits=10, decimal_places=2, required=True)
+    currency = serializers.CharField(max_length=10, required=True)
+    package_weight = serializers.DecimalField(max_digits=10, decimal_places=2, required=True)
+    package_type = serializers.CharField(max_length=50, required=True)
+    qbox_id = serializers.CharField(max_length=50, required=True)
+    phone = serializers.CharField(max_length=20, required=True)
+    email = serializers.EmailField(required=True)
+    full_name = serializers.CharField(max_length=100, required=True)
+
+    def create(self, validated_data):
+        """Create a new outgoing package with 'Sent' status"""
+        # Create PackageDetails for the package
+        details_data = {
+            'package_type': validated_data.pop('package_type'),
+            'package_weight': str(validated_data.pop('package_weight')),
+        }
+        details = PackageDetails.objects.create(**details_data)
+        
+        # Auto-generate tracking_id
+        tracking_id = f"SND-{str(uuid.uuid4())[:8].upper()}"
+        
+        # Create the package as Outgoing with Sent status
+        package = Package.objects.create(
+            tracking_id=tracking_id,
+            service_provider=validated_data.pop('shipping_company'),
+            outgoing_status='Sent',
+            package_type='Outgoing',
+            shipment_status=Package.ShipmentStatus.SHIPMENT_CREATED,
+            details=details,
+            **validated_data
+        )
+        return package
+
+
+class ReturnPackageSerializer(serializers.Serializer):
+    """Serializer for creating a Return Package"""
+    return_package_image = serializers.URLField(required=True)
+    package_description = serializers.CharField(required=True)
+    package_item_value = serializers.DecimalField(max_digits=10, decimal_places=2, required=True)
+    currency = serializers.CharField(max_length=10, required=True)
+    package_weight = serializers.DecimalField(max_digits=10, decimal_places=2, required=True)
+    package_type = serializers.CharField(max_length=50, required=True)
+    pin_code = serializers.CharField(max_length=20, required=True)
+
+    def create(self, validated_data):
+        """Create a new outgoing package with 'Return' status"""
+        # Create PackageDetails for the package
+        details_data = {
+            'package_type': validated_data.pop('package_type'),
+            'package_weight': str(validated_data.pop('package_weight')),
+        }
+        details = PackageDetails.objects.create(**details_data)
+        
+        # Auto-generate tracking_id
+        tracking_id = f"RET-{str(uuid.uuid4())[:8].upper()}"
+        
+        # Create the package as Outgoing with Return status
+        package = Package.objects.create(
+            tracking_id=tracking_id,
+            outgoing_status='Return',
+            package_type='Outgoing',
+            shipment_status=Package.ShipmentStatus.SHIPMENT_CREATED,
+            details=details,
+            **validated_data
+        )
+        return package
+
+
+class OutgoingPackageSerializer(serializers.ModelSerializer):
+    """Serializer for Outgoing packages (both Send and Return)"""
+    details = PackageDetailsSerializer(read_only=True)
+    
+    class Meta:
+        model = Package
+        fields = [
+            'id', 'tracking_id', 'service_provider', 'qbox', 
+            'outgoing_status', 'shipment_status', 'created_at', 
+            'last_update', 'details'
+        ]
