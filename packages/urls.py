@@ -5,11 +5,21 @@ from .views import (
     PackageCreateAPIView,
     PackageUpdateAPIView,
     PackageStatusUpdateAPIView,
-    PackageDeleteAPIView
+    PackageDeleteAPIView,
+    SendPackageAPIView,
+    ReturnPackageAPIView,
+    OutgoingPackagesAPIView,
+    DeliveredPackagesAPIView,
+    IncomingPackagesAPIView,
 )
 urlpatterns = [
     path('', PackageListAPIView.as_view(), name='package-list'),
     path('create', PackageCreateAPIView.as_view(), name='package-create'),
+    path('send', SendPackageAPIView.as_view(), name='package-send'),
+    path('return', ReturnPackageAPIView.as_view(), name='package-return'),
+    path('outgoing', OutgoingPackagesAPIView.as_view(), name='packages-outgoing'),
+    path('delivered', DeliveredPackagesAPIView.as_view(), name='packages-delivered'),
+    path('incoming', IncomingPackagesAPIView.as_view(), name='packages-incoming'),
     path('<uuid:id>', PackageDetailAPIView.as_view(), name='package-detail'),
     path('<uuid:id>/update', PackageUpdateAPIView.as_view(), name='package-update'),
     path('<uuid:id>/change-status', PackageStatusUpdateAPIView.as_view(), name='package-status'),
