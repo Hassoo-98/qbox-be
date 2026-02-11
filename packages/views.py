@@ -343,20 +343,19 @@ class SendPackageAPIView(generics.CreateAPIView):
     The package will be of type 'Outgoing' and can be filtered using package_type=Outgoing
     with outgoing_status=Sent in the packages list API.
     
-    Request Body (camelCase field names):
+    Request Body (camelCase field names - ALL FIELDS REQUIRED):
     {
         "shippingCompany": "mainDoor",
-        "qboxImage": "https://example.com/image.jpeg",
+        "qboxImage": "file:///data/user/0/host.exp.exponent/cache/ImagePicker/390808c2-8678-47cb-9502-dd7661e11b33.jpeg",
         "packageDescription": "This is the description",
-        "packageItemValue": 5.00,
+        "packageItemValue": 5,
         "currency": "sar",
-        "packageWeight": 2.5,
+        "packageWeight": 2,
         "packageType": "mainDoor",
-        "qBoxId": "QBOX001",
+        "qBoxId": "345345",
         "phone": "+923434534533",
-        "email": "sender@example.com",
-        "fullName": "John Doe",
-        "merchantName": "Merchant Name"
+        "email": "sardar@gmail.com",
+        "fullName": "Sardar Hussain"
     }
     
     Response:
@@ -366,10 +365,11 @@ class SendPackageAPIView(generics.CreateAPIView):
         "data": {
             "id": "uuid",
             "tracking_id": "SND-ABC12345",
-            "merchant_name": "John Doe",
+            "merchant_name": "Sardar Hussain",
             "service_provider": "mainDoor",
             "outgoing_status": "Sent",
             "package_type": "Outgoing",
+            "shipment_status": "Shipment-Created",
             ...
         },
         "message": "Send package created successfully"
@@ -388,54 +388,54 @@ class SendPackageAPIView(generics.CreateAPIView):
         - Have outgoing_status set to 'Sent'
         - Be retrievable via the main packages list API with ?package_type=Outgoing&outgoing_status=Sent
         
-        Required fields: shipping_company, package_description, package_weight, package_type, qbox_id
-        Optional fields: qbox_image, package_item_value, currency, phone, email, full_name, merchant_name
+        ALL FIELDS ARE REQUIRED as per the API specification.
         """,
         tags=["Package"],
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
-            required=["shipping_company", "package_description", "package_weight", "package_type", "qbox_id"],
+            required=["shippingCompany", "qboxImage", "packageDescription", "packageItemValue", 
+                      "currency", "packageWeight", "packageType", "qBoxId", "phone", "email", "fullName"],
             properties={
-                "shipping_company": openapi.Schema(
+                "shippingCompany": openapi.Schema(
                     type=openapi.TYPE_STRING, 
                     description="Shipping company name",
                     example="mainDoor"
                 ),
-                "qbox_image": openapi.Schema(
+                "qboxImage": openapi.Schema(
                     type=openapi.TYPE_STRING, 
                     format=openapi.FORMAT_URI, 
                     description="URL of the package image",
-                    example="https://example.com/image.jpeg"
+                    example="file:///data/user/0/host.exp.exponent/cache/ImagePicker/390808c2-8678-47cb-9502-dd7661e11b33.jpeg"
                 ),
-                "package_description": openapi.Schema(
+                "packageDescription": openapi.Schema(
                     type=openapi.TYPE_STRING, 
                     description="Description of the package",
-                    example="This is the package description"
+                    example="This is the description"
                 ),
-                "package_item_value": openapi.Schema(
+                "packageItemValue": openapi.Schema(
                     type=openapi.TYPE_NUMBER, 
                     description="Value of the package item",
-                    example=5.00
+                    example=5
                 ),
                 "currency": openapi.Schema(
                     type=openapi.TYPE_STRING, 
                     description="Currency code (e.g., SAR, USD)",
-                    example="SAR"
+                    example="sar"
                 ),
-                "package_weight": openapi.Schema(
+                "packageWeight": openapi.Schema(
                     type=openapi.TYPE_NUMBER, 
-                    description="Weight of the package (kg)",
-                    example=2.5
+                    description="Weight of the package",
+                    example=2
                 ),
-                "package_type": openapi.Schema(
+                "packageType": openapi.Schema(
                     type=openapi.TYPE_STRING, 
                     description="Type of package",
                     example="mainDoor"
                 ),
-                "qbox_id": openapi.Schema(
+                "qBoxId": openapi.Schema(
                     type=openapi.TYPE_STRING, 
-                    description="QBox ID where the package is being sent from",
-                    example="QBOX001"
+                    description="QBox ID",
+                    example="345345"
                 ),
                 "phone": openapi.Schema(
                     type=openapi.TYPE_STRING, 
@@ -446,17 +446,12 @@ class SendPackageAPIView(generics.CreateAPIView):
                     type=openapi.TYPE_STRING, 
                     format=openapi.FORMAT_EMAIL, 
                     description="Contact email",
-                    example="sender@example.com"
+                    example="sardar@gmail.com"
                 ),
-                "full_name": openapi.Schema(
+                "fullName": openapi.Schema(
                     type=openapi.TYPE_STRING, 
                     description="Full name of the sender",
-                    example="John Doe"
-                ),
-                "merchant_name": openapi.Schema(
-                    type=openapi.TYPE_STRING, 
-                    description="Merchant name",
-                    example="Merchant Name"
+                    example="Sardar Hussain"
                 ),
             }
         ),
@@ -497,17 +492,15 @@ class ReturnPackageAPIView(generics.CreateAPIView):
     The package will be of type 'Outgoing' and can be filtered using package_type=Outgoing
     with outgoing_status=Return in the packages list API.
     
-    Request Body (snake_case field names):
+    Request Body (camelCase field names - ALL FIELDS REQUIRED):
     {
-        "return_package_image": "https://example.com/image.jpeg",
-        "package_description": "This is the description for the return package",
-        "package_item_value": 8.00,
+        "returnPackageImage": "file:///data/user/0/host.exp.exponent/cache/ImagePicker/124282a4-d02b-40f6-a767-fba00bbddc42.jpeg",
+        "packageDescription": "This is the description for the return package",
+        "packageItemValue": 8,
         "currency": "sar",
-        "package_weight": 3.0,
-        "package_type": "mainDoor",
-        "pin_code": "123456",
-        "qbox_id": "QBOX001",
-        "merchant_name": "Merchant Name"
+        "packageWeight": 3,
+        "packageType": "mainDoor",
+        "pinCode": "1231"
     }
     
     Response:
@@ -517,9 +510,9 @@ class ReturnPackageAPIView(generics.CreateAPIView):
         "data": {
             "id": "uuid",
             "tracking_id": "RET-ABC12345",
-            "merchant_name": "Merchant Name",
             "outgoing_status": "Return",
             "package_type": "Outgoing",
+            "shipment_status": "Shipment-Created",
             ...
         },
         "message": "Return package created successfully"
@@ -538,59 +531,49 @@ class ReturnPackageAPIView(generics.CreateAPIView):
         - Have outgoing_status set to 'Return'
         - Be retrievable via the main packages list API with ?package_type=Outgoing&outgoing_status=Return
         
-        Required fields: package_description, package_weight, package_type
-        Optional fields: return_package_image, package_item_value, currency, pin_code, qbox_id, merchant_name
+        ALL FIELDS ARE REQUIRED as per the API specification.
         """,
         tags=["Package"],
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
-            required=["package_description", "package_weight", "package_type"],
+            required=["returnPackageImage", "packageDescription", "packageItemValue", 
+                      "currency", "packageWeight", "packageType", "pinCode"],
             properties={
-                "return_package_image": openapi.Schema(
+                "returnPackageImage": openapi.Schema(
                     type=openapi.TYPE_STRING, 
                     format=openapi.FORMAT_URI, 
                     description="URL of the return package image",
-                    example="https://example.com/image.jpeg"
+                    example="file:///data/user/0/host.exp.exponent/cache/ImagePicker/124282a4-d02b-40f6-a767-fba00bbddc42.jpeg"
                 ),
-                "package_description": openapi.Schema(
+                "packageDescription": openapi.Schema(
                     type=openapi.TYPE_STRING, 
                     description="Description of the return package",
                     example="This is the description for the return package"
                 ),
-                "package_item_value": openapi.Schema(
+                "packageItemValue": openapi.Schema(
                     type=openapi.TYPE_NUMBER, 
                     description="Value of the package item",
-                    example=8.00
+                    example=8
                 ),
                 "currency": openapi.Schema(
                     type=openapi.TYPE_STRING, 
                     description="Currency code (e.g., SAR, USD)",
-                    example="SAR"
+                    example="sar"
                 ),
-                "package_weight": openapi.Schema(
+                "packageWeight": openapi.Schema(
                     type=openapi.TYPE_NUMBER, 
-                    description="Weight of the package (kg)",
-                    example=3.0
+                    description="Weight of the package",
+                    example=3
                 ),
-                "package_type": openapi.Schema(
+                "packageType": openapi.Schema(
                     type=openapi.TYPE_STRING, 
                     description="Type of package",
                     example="mainDoor"
                 ),
-                "pin_code": openapi.Schema(
+                "pinCode": openapi.Schema(
                     type=openapi.TYPE_STRING, 
-                    description="PIN code for return verification",
-                    example="123456"
-                ),
-                "qbox_id": openapi.Schema(
-                    type=openapi.TYPE_STRING, 
-                    description="QBox ID associated with the return",
-                    example="QBOX001"
-                ),
-                "merchant_name": openapi.Schema(
-                    type=openapi.TYPE_STRING, 
-                    description="Merchant or sender name",
-                    example="Merchant Name"
+                    description="PIN code for return",
+                    example="1231"
                 ),
             }
         ),
