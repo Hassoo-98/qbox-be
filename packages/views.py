@@ -14,6 +14,8 @@ from .serializers import (
     SendPackageSerializer,
     ReturnPackageSerializer,
     OutgoingPackageSerializer,
+    SendPackageResponseSerializer,
+    ReturnPackageResponseSerializer,
 )
 from utils.swagger_schema import (
     SwaggerHelper,
@@ -456,7 +458,7 @@ class SendPackageAPIView(generics.CreateAPIView):
         ),
         responses={
             201: create_success_response(
-                get_serializer_schema(PackageSerializer),
+                get_serializer_schema(SendPackageResponseSerializer),
                 description="Send package created successfully. Returns the created package with tracking ID."
             ),
             400: ValidationErrorResponse,
@@ -467,7 +469,7 @@ class SendPackageAPIView(generics.CreateAPIView):
             serializer = self.get_serializer(data=request.data)
             if serializer.is_valid(raise_exception=True):
                 package = serializer.save()
-                package_data = PackageSerializer(package).data
+                package_data = SendPackageResponseSerializer(package).data
                 return Response({
                     "success": True,
                     "statusCode": status.HTTP_201_CREATED,
@@ -577,7 +579,7 @@ class ReturnPackageAPIView(generics.CreateAPIView):
         ),
         responses={
             201: create_success_response(
-                get_serializer_schema(PackageSerializer),
+                get_serializer_schema(ReturnPackageResponseSerializer),
                 description="Return package created successfully. Returns the created package with tracking ID."
             ),
             400: ValidationErrorResponse,
@@ -588,7 +590,7 @@ class ReturnPackageAPIView(generics.CreateAPIView):
             serializer = self.get_serializer(data=request.data)
             if serializer.is_valid(raise_exception=True):
                 package = serializer.save()
-                package_data = PackageSerializer(package).data
+                package_data = ReturnPackageResponseSerializer(package).data
                 return Response({
                     "success": True,
                     "statusCode": status.HTTP_201_CREATED,
@@ -663,6 +665,20 @@ class OutgoingPackagesAPIView(generics.ListAPIView):
             ),
         }
     )
+    def get_paginated_response(self, data):
+        return Response({
+            "success": True,
+            "statusCode": status.HTTP_200_OK,
+            "data": {
+                "items": data,
+                "total": self.paginator.page.paginator.count,
+                "page": self.paginator.page.number,
+                "limit": self.paginator.page_size,
+                "hasMore": self.paginator.page.has_next(),
+            },
+            "message": "List Packages"
+        })
+    
     def get(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(queryset)
@@ -694,6 +710,20 @@ class DeliveredPackagesAPIView(generics.ListAPIView):
     ordering_fields = ['tracking_id', 'merchant_name', 'service_provider', 'driver_name', 'created_at', 'last_update']
     ordering = ['-created_at']
 
+    def get_paginated_response(self, data):
+        return Response({
+            "success": True,
+            "statusCode": status.HTTP_200_OK,
+            "data": {
+                "items": data,
+                "total": self.paginator.page.paginator.count,
+                "page": self.paginator.page.number,
+                "limit": self.paginator.page_size,
+                "hasMore": self.paginator.page.has_next(),
+            },
+            "message": "Delivered packages"
+        })
+
     @swagger_auto_schema(
         operation_summary="[Package] List delivered packages",
         operation_description="Retrieve a paginated list of all delivered packages",
@@ -705,6 +735,20 @@ class DeliveredPackagesAPIView(generics.ListAPIView):
             ),
         }
     )
+    def get_paginated_response(self, data):
+        return Response({
+            "success": True,
+            "statusCode": status.HTTP_200_OK,
+            "data": {
+                "items": data,
+                "total": self.paginator.page.paginator.count,
+                "page": self.paginator.page.number,
+                "limit": self.paginator.page_size,
+                "hasMore": self.paginator.page.has_next(),
+            },
+            "message": "Delivered packages"
+        })
+
     def get(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(queryset)
@@ -747,6 +791,20 @@ class IncomingPackagesAPIView(generics.ListAPIView):
             ),
         }
     )
+    def get_paginated_response(self, data):
+        return Response({
+            "success": True,
+            "statusCode": status.HTTP_200_OK,
+            "data": {
+                "items": data,
+                "total": self.paginator.page.paginator.count,
+                "page": self.paginator.page.number,
+                "limit": self.paginator.page_size,
+                "hasMore": self.paginator.page.has_next(),
+            },
+            "message": "Incoming packages"
+        })
+
     def get(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(queryset)
