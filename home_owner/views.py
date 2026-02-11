@@ -309,4 +309,5 @@ class HomeOwnerResetPasswordView(generics.CreateAPIView):
             "statusCode": status.HTTP_200_OK,
             "data": None,
             "message": "Password reset successfully"
+            
         }, status=status.HTTP_200_OK)
