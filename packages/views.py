@@ -11,6 +11,9 @@ from .serializers import (
     PackageCreateSerializer,
     PackageStatusUpdateSerializer,
     PackageUpdateSerializer,
+    SendPackageSerializer,
+    ReturnPackageSerializer,
+    OutgoingPackageSerializer,
 )
 from utils.swagger_schema import (
     SwaggerHelper,
@@ -293,3 +296,269 @@ class PackageDeleteAPIView(generics.DestroyAPIView):
             "data": package_data,
             "message": "Package deleted successfully"
         }, status=status.HTTP_200_OK)
+
+
+class SendPackageAPIView(generics.CreateAPIView):
+    '''
+    Post: Create a new send package (outgoing package with 'Sent' status)
+    
+    Payload:
+    {
+        "shippingCompany": "mainDoor",
+        "qboxImage": "file:///data/user/0/host.exp.exponent/cache/ImagePicker/390808c2-8678-47cb-9502-dd7661e11b33.jpeg",
+        "packageDescription": "This is the descrition",
+        "packageItemValue": 5,
+        "currency": "sar",
+        "packageWeight": 2,
+        "packageType": "mainDoor",
+        "qBoxId": "345345",
+        "phone": "+923434534533",
+        "email": "sardar@gmail.com",
+        "fullName": "Sardar Hussain"
+    }
+    '''
+    queryset = Package.objects.all()
+    serializer_class = SendPackageSerializer
+    permission_classes = [permissions.AllowAny]
+
+    @swagger_auto_schema(
+        operation_summary="[Package] Create send package",
+        operation_description="Create a new outgoing package with 'Sent' status",
+        tags=["Package"],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=["shippingCompany", "qboxImage", "packageDescription", "packageItemValue", 
+                      "currency", "packageWeight", "packageType", "qBoxId", "phone", "email", "fullName"],
+            properties={
+                "shippingCompany": openapi.Schema(type=openapi.TYPE_STRING, description="Shipping company name"),
+                "qboxImage": openapi.Schema(type=openapi.TYPE_STRING, format=openapi.FORMAT_URI, description="URL of the package image"),
+                "packageDescription": openapi.Schema(type=openapi.TYPE_STRING, description="Description of the package"),
+                "packageItemValue": openapi.Schema(type=openapi.TYPE_NUMBER, description="Value of the package item"),
+                "currency": openapi.Schema(type=openapi.TYPE_STRING, description="Currency code (e.g., SAR)"),
+                "packageWeight": openapi.Schema(type=openapi.TYPE_NUMBER, description="Weight of the package"),
+                "packageType": openapi.Schema(type=openapi.TYPE_STRING, description="Type of package"),
+                "qBoxId": openapi.Schema(type=openapi.TYPE_STRING, description="QBox ID"),
+                "phone": openapi.Schema(type=openapi.TYPE_STRING, description="Contact phone number"),
+                "email": openapi.Schema(type=openapi.TYPE_STRING, format=openapi.FORMAT_EMAIL, description="Contact email"),
+                "fullName": openapi.Schema(type=openapi.TYPE_STRING, description="Full name of the sender"),
+            }
+        ),
+        responses={
+            201: create_success_response(
+                get_serializer_schema(PackageSerializer),
+                description="Send package created successfully"
+            ),
+            400: ValidationErrorResponse,
+        }
+    )
+    def post(self, request, *args, **kwargs):
+        try:
+            serializer = self.get_serializer(data=request.data)
+            if serializer.is_valid(raise_exception=True):
+                package = serializer.save()
+                package_data = PackageSerializer(package).data
+                return Response({
+                    "success": True,
+                    "statusCode": status.HTTP_201_CREATED,
+                    "data": package_data,
+                    "message": "Send package created successfully"
+                }, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({
+                "success": False,
+                "statusCode": status.HTTP_400_BAD_REQUEST,
+                "data": None,
+                "message": str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ReturnPackageAPIView(generics.CreateAPIView):
+    '''
+    Post: Create a new return package (outgoing package with 'Return' status)
+    
+    Payload:
+    {
+        "returnPackageImage": "file:///data/user/0/host.exp.exponent/cache/ImagePicker/124282a4-d02b-40f6-a767-fba00bbddc42.jpeg",
+        "packageDescription": "This is the description for the return package",
+        "packageItemValue": 8,
+        "currency": "sar",
+        "packageWeight": 3,
+        "packageType": "mainDoor",
+        "pinCode": "1231"
+    }
+    '''
+    queryset = Package.objects.all()
+    serializer_class = ReturnPackageSerializer
+    permission_classes = [permissions.AllowAny]
+
+    @swagger_auto_schema(
+        operation_summary="[Package] Create return package",
+        operation_description="Create a new outgoing package with 'Return' status",
+        tags=["Package"],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=["returnPackageImage", "packageDescription", "packageItemValue", 
+                      "currency", "packageWeight", "packageType", "pinCode"],
+            properties={
+                "returnPackageImage": openapi.Schema(type=openapi.TYPE_STRING, format=openapi.FORMAT_URI, description="URL of the return package image"),
+                "packageDescription": openapi.Schema(type=openapi.TYPE_STRING, description="Description of the return package"),
+                "packageItemValue": openapi.Schema(type=openapi.TYPE_NUMBER, description="Value of the package item"),
+                "currency": openapi.Schema(type=openapi.TYPE_STRING, description="Currency code (e.g., SAR)"),
+                "packageWeight": openapi.Schema(type=openapi.TYPE_NUMBER, description="Weight of the package"),
+                "packageType": openapi.Schema(type=openapi.TYPE_STRING, description="Type of package"),
+                "pinCode": openapi.Schema(type=openapi.TYPE_STRING, description="PIN code for return"),
+            }
+        ),
+        responses={
+            201: create_success_response(
+                get_serializer_schema(PackageSerializer),
+                description="Return package created successfully"
+            ),
+            400: ValidationErrorResponse,
+        }
+    )
+    def post(self, request, *args, **kwargs):
+        try:
+            serializer = self.get_serializer(data=request.data)
+            if serializer.is_valid(raise_exception=True):
+                package = serializer.save()
+                package_data = PackageSerializer(package).data
+                return Response({
+                    "success": True,
+                    "statusCode": status.HTTP_201_CREATED,
+                    "data": package_data,
+                    "message": "Return package created successfully"
+                }, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({
+                "success": False,
+                "statusCode": status.HTTP_400_BAD_REQUEST,
+                "data": None,
+                "message": str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+
+class OutgoingPackagesAPIView(generics.ListAPIView):
+    '''
+    Get: List all outgoing packages (includes both Send and Return packages)
+    '''
+    queryset = Package.objects.filter(package_type='Outgoing')
+    serializer_class = OutgoingPackageSerializer
+    permission_classes = [permissions.AllowAny]
+    pagination_class = StandardResultsPagination
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['tracking_id', 'service_provider', 'outgoing_status']
+    ordering_fields = ['tracking_id', 'created_at', 'last_update', 'shipment_status']
+    ordering = ['-created_at']
+
+    @swagger_auto_schema(
+        operation_summary="[Package] List outgoing packages",
+        operation_description="Retrieve a paginated list of all outgoing packages (Send and Return)",
+        tags=["Package"],
+        responses={
+            200: create_success_response(
+                get_serializer_schema(OutgoingPackageSerializer, many=True),
+                description="Outgoing packages retrieved successfully"
+            ),
+        }
+    )
+    def get(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response({
+            "success": True,
+            "statusCode": status.HTTP_200_OK,
+            "data": {
+                "items": serializer.data,
+                "total": len(serializer.data),
+            },
+            "message": "Outgoing packages retrieved successfully"
+        })
+
+
+class DeliveredPackagesAPIView(generics.ListAPIView):
+    '''
+    Get: List all delivered packages
+    '''
+    queryset = Package.objects.filter(package_type='Delivered')
+    serializer_class = PackageSerializer
+    permission_classes = [permissions.AllowAny]
+    pagination_class = StandardResultsPagination
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['tracking_id', 'merchant_name', 'service_provider', 'driver_name']
+    ordering_fields = ['tracking_id', 'merchant_name', 'service_provider', 'driver_name', 'created_at', 'last_update']
+    ordering = ['-created_at']
+
+    @swagger_auto_schema(
+        operation_summary="[Package] List delivered packages",
+        operation_description="Retrieve a paginated list of all delivered packages",
+        tags=["Package"],
+        responses={
+            200: create_success_response(
+                get_serializer_schema(PackageSerializer, many=True),
+                description="Delivered packages retrieved successfully"
+            ),
+        }
+    )
+    def get(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response({
+            "success": True,
+            "statusCode": status.HTTP_200_OK,
+            "data": {
+                "items": serializer.data,
+                "total": len(serializer.data),
+            },
+            "message": "Delivered packages retrieved successfully"
+        })
+
+
+class IncomingPackagesAPIView(generics.ListAPIView):
+    '''
+    Get: List all incoming packages
+    '''
+    queryset = Package.objects.filter(package_type='Incoming')
+    serializer_class = PackageSerializer
+    permission_classes = [permissions.AllowAny]
+    pagination_class = StandardResultsPagination
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['tracking_id', 'merchant_name', 'service_provider', 'driver_name', 'city']
+    ordering_fields = ['tracking_id', 'merchant_name', 'service_provider', 'driver_name', 'city', 'created_at', 'last_update']
+    ordering = ['-created_at']
+
+    @swagger_auto_schema(
+        operation_summary="[Package] List incoming packages",
+        operation_description="Retrieve a paginated list of all incoming packages",
+        tags=["Package"],
+        responses={
+            200: create_success_response(
+                get_serializer_schema(PackageSerializer, many=True),
+                description="Incoming packages retrieved successfully"
+            ),
+        }
+    )
+    def get(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response({
+            "success": True,
+            "statusCode": status.HTTP_200_OK,
+            "data": {
+                "items": serializer.data,
+                "total": len(serializer.data),
+            },
+            "message": "Incoming packages retrieved successfully"
+        })
