@@ -231,3 +231,6 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_DIRS = [
+    '/home/hassaanqazi/Documents/qbox-be/venv/lib/python3.14/site-packages/drf_yasg/static',
+]

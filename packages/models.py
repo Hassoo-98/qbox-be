@@ -1,6 +1,7 @@
 from django.db import models
 from django.utils import timezone
 import uuid
+
 class PackageDetails(models.Model):
     package_type = models.CharField(
         max_length=50,         
@@ -25,9 +26,14 @@ class PackageDetails(models.Model):
 
 
 class Package(models.Model):
-    class PackageStatus(models.TextChoices):
+    class PackageType(models.TextChoices):
         INCOMING = "Incoming", "Incoming"
-        SENT     = "Send",     "Sent"
+        OUTGOING = "Outgoing", "Outgoing"
+        DELIVERED = "Delivered", "Delivered"
+
+    class OutgoingStatus(models.TextChoices):
+        SENT = "Sent", "Sent"
+        RETURNED = "Return", "Return"
 
     class ShipmentStatus(models.TextChoices):
         SHIPMENT_CREATED    = "Shipment-Created",    "Shipment Created"
@@ -83,10 +89,26 @@ class Package(models.Model):
         blank=True,
         help_text="QR code value or URL"
     )
-    package_status = models.CharField(
+    
+    package_type = models.CharField(
         max_length=20,
-        choices=PackageStatus.choices,
-        default=PackageStatus.INCOMING
+        choices=PackageType.choices,
+        default=PackageType.INCOMING,
+        help_text="Type of package: Incoming, Outgoing, or Delivered"
+    )
+    
+    outgoing_status = models.CharField(
+        max_length=20,
+        choices=OutgoingStatus.choices,
+        blank=True,
+        null=True,
+        help_text="Status for Outgoing packages: Sent or Return"
+    )
+    
+    city = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text="City name (required for Incoming packages)"
     )
 
     shipment_status = models.CharField(
@@ -123,4 +145,5 @@ class Package(models.Model):
             models.Index(fields=["tracking_id"]),
             models.Index(fields=["qbox"]),
             models.Index(fields=["shipment_status"]),
+            models.Index(fields=["package_type"]),
         ]

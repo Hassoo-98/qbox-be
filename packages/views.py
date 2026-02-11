@@ -10,6 +10,7 @@ from .serializers import (
     PackageSerializer,
     PackageCreateSerializer,
     PackageStatusUpdateSerializer,
+    PackageUpdateSerializer,
 )
 from utils.swagger_schema import (
     SwaggerHelper,
@@ -20,8 +21,22 @@ from utils.swagger_schema import (
     COMMON_RESPONSES,
 )
 
-# Swagger Helper for Package
 swagger = SwaggerHelper(tag="Package")
+
+
+
+package_type_schema = openapi.Schema(
+    type=openapi.TYPE_STRING,
+    enum=Package.PackageType.values,
+    description="Package type: 'Incoming', 'Outgoing', or 'Delivered'"
+)
+
+
+outgoing_status_schema = openapi.Schema(
+    type=openapi.TYPE_STRING,
+    enum=Package.OutgoingStatus.values,
+    description="Outgoing status: 'Sent' or 'Return' (only for Outgoing packages)"
+)
 
 
 class StandardResultsPagination(PageNumberPagination):
@@ -41,13 +56,13 @@ class PackageListAPIView(generics.ListAPIView):
     pagination_class = StandardResultsPagination
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["tracking_id", "merchant_name", "service_provider", "driver_name"]
-    ordering_fields = ["tracking_id", "merchant_name", "service_provider", "driver_name", "created_at", "last_update", "package_status", "shipment_status"]
+    ordering_fields = ["tracking_id", "merchant_name", "service_provider", "driver_name", "created_at", "last_update", "package_type", "shipment_status"]
     ordering = ["-created_at"]
 
     @swagger_auto_schema(
         **swagger.list_operation(
             summary="List all packages",
-            description="Retrieve a paginated list of all packages with optional filtering by search query, ordering, active status, and package type.",
+            description="Retrieve a paginated list of all packages with optional filtering by search query, ordering, and package type.",
             serializer=PackageSerializer
         )
     )
@@ -88,6 +103,16 @@ class PackageListAPIView(generics.ListAPIView):
 class PackageCreateAPIView(generics.CreateAPIView):
     '''
     Post: Create a new package
+    
+    Package Types:
+    - **Incoming**: For packages being delivered TO a location. Requires 'city' field.
+    - **Outgoing**: For packages being sent FROM a location. Requires 'outgoing_status' field (Sent or Return).
+    - **Delivered**: For packages that have been delivered. No special requirements.
+    
+    Field Requirements by Package Type:
+    - Incoming: city (required), outgoing_status (not allowed)
+    - Outgoing: outgoing_status (required: Sent or Return), city (optional)
+    - Delivered: no special requirements
     '''
     queryset = Package.objects.all()
     serializer_class = PackageCreateSerializer
@@ -96,7 +121,7 @@ class PackageCreateAPIView(generics.CreateAPIView):
     @swagger_auto_schema(
         **swagger.create_operation(
             summary="Create a new package",
-            description="Register a new subscription package with name, description, pricing, and duration.",
+            description="Register a new package. Package type determines field requirements: Incoming requires city, Outgoing requires outgoing_status.",
             serializer=PackageCreateSerializer
         )
     )
@@ -133,7 +158,7 @@ class PackageDetailAPIView(generics.RetrieveAPIView):
     @swagger_auto_schema(
         **swagger.retrieve_operation(
             summary="Get package details",
-            description="Retrieve detailed information about a specific package including pricing, duration, and features.",
+            description="Retrieve detailed information about a specific package including all fields and status.",
             serializer=PackageSerializer
         )
     )
@@ -150,18 +175,28 @@ class PackageDetailAPIView(generics.RetrieveAPIView):
 
 class PackageUpdateAPIView(generics.UpdateAPIView):
     '''
-    Put: Update a package
+    Put/Patch: Update a package
+    
+    Package Types:
+    - **Incoming**: Requires 'city' field, 'outgoing_status' not allowed
+    - **Outgoing**: Requires 'outgoing_status' field (Sent or Return)
+    - **Delivered**: No special requirements
+    
+    Field Requirements by Package Type:
+    - Incoming: city (required), outgoing_status (not allowed)
+    - Outgoing: outgoing_status (required: Sent or Return), city (optional)
+    - Delivered: no special requirements
     '''
     queryset = Package.objects.all()
-    serializer_class = PackageSerializer
+    serializer_class = PackageUpdateSerializer
     permission_classes = [permissions.AllowAny]
     lookup_field = "id"
 
     @swagger_auto_schema(
         **swagger.update_operation(
             summary="Update package",
-            description="Update package information such as name, description, price, duration, or active status.",
-            serializer=PackageSerializer
+            description="Update package information. Package type determines field requirements.",
+            serializer=PackageUpdateSerializer
         )
     )
     def patch(self, request, *args, **kwargs):
@@ -180,7 +215,12 @@ class PackageUpdateAPIView(generics.UpdateAPIView):
 
 class PackageStatusUpdateAPIView(generics.UpdateAPIView):
     '''
-    Patch: Update package active status
+    Patch: Update package type and status
+    
+    Updates package type with validation:
+    - **Incoming**: Requires 'city', 'outgoing_status' not allowed
+    - **Outgoing**: Requires 'outgoing_status' (Sent or Return)
+    - **Delivered**: No special requirements
     '''
     queryset = Package.objects.all()
     serializer_class = PackageStatusUpdateSerializer
@@ -189,9 +229,19 @@ class PackageStatusUpdateAPIView(generics.UpdateAPIView):
     http_method_names = ['patch']
 
     @swagger_auto_schema(
-        operation_summary="[Package] Update package status",
-        operation_description="Update package active status. Activating a package makes it available for subscription. Deactivating hides it from the subscription options.",
+        operation_summary="[Package] Update package type and status",
+        operation_description="Update package type with conditional field validation based on package type.",
         tags=["Package"],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=["package_type", "is_active"],
+            properties={
+                "package_type": package_type_schema,
+                "outgoing_status": outgoing_status_schema,
+                "city": openapi.Schema(type=openapi.TYPE_STRING, description="City name (required for Incoming)"),
+                "is_active": openapi.Schema(type=openapi.TYPE_BOOLEAN, description="Active status")
+            }
+        ),
         responses={
             200: create_success_response(
                 get_serializer_schema(PackageSerializer),

@@ -15,8 +15,8 @@ class PackageSerializer(serializers.ModelSerializer):
         fields = [
             "id", "qbox", "tracking_id", "merchant_name",
             "service_provider", "driver_name", "qr_code",
-            "package_status", "shipment_status", "last_update",
-            "created_at", "details"
+            "package_type", "outgoing_status", "city",
+            "shipment_status", "last_update", "created_at", "details"
         ]
         read_only_fields = ["id", "created_at", "last_update"]
 
@@ -26,7 +26,7 @@ class PackageListSerializer(serializers.ModelSerializer):
         fields = [
             "id", "tracking_id", "merchant_name",
             "service_provider", "driver_name",
-            "package_status", "shipment_status", "created_at"
+            "package_type", "outgoing_status", "shipment_status", "created_at"
         ]
 
 class PackageCreateSerializer(serializers.ModelSerializer):
@@ -37,11 +37,40 @@ class PackageCreateSerializer(serializers.ModelSerializer):
         fields = [
             "qbox", "tracking_id", "merchant_name",
             "service_provider", "driver_name", "qr_code",
-            "package_status", "shipment_status", "details"
+            "package_type", "outgoing_status", "city", "details"
         ]
         extra_kwargs = {
             "tracking_id": {"required": False, "allow_blank": True}
         }
+
+    def validate(self, data):
+        """
+        Validate fields based on package type:
+        - Incoming: city is required, outgoing_status should not be set
+        - Outgoing: outgoing_status is required (Sent or Return)
+        - Delivered: no special requirements
+        """
+        package_type = data.get('package_type', 'Incoming')
+        
+        if package_type == 'Incoming':
+            if not data.get('city'):
+                raise serializers.ValidationError({
+                    "city": "City is required for Incoming packages."
+                })
+            if data.get('outgoing_status'):
+                raise serializers.ValidationError({
+                    "outgoing_status": "Outgoing status should not be set for Incoming packages."
+                })
+        
+        elif package_type == 'Outgoing':
+            if not data.get('outgoing_status'):
+                raise serializers.ValidationError({
+                    "outgoing_status": "Outgoing status (Sent or Return) is required for Outgoing packages."
+                })
+        
+        # Delivered packages have no special requirements
+        
+        return data
 
     def create(self, validated_data):
         # Auto-generate tracking_id if not provided
@@ -66,8 +95,34 @@ class PackageUpdateSerializer(serializers.ModelSerializer):
         fields = [
             "qbox", "merchant_name",
             "service_provider", "driver_name", "qr_code",
-            "package_status", "shipment_status", "details"
+            "package_type", "outgoing_status", "city", "shipment_status", "details"
         ]
+
+    def validate(self, data):
+        """
+        Validate fields based on package type during update:
+        - Incoming: city is required, outgoing_status should not be set
+        - Outgoing: outgoing_status is required (Sent or Return)
+        """
+        package_type = data.get('package_type', getattr(self.instance, 'package_type', 'Incoming'))
+        
+        if package_type == 'Incoming':
+            if not data.get('city') and not getattr(self.instance, 'city', None):
+                raise serializers.ValidationError({
+                    "city": "City is required for Incoming packages."
+                })
+            if data.get('outgoing_status'):
+                raise serializers.ValidationError({
+                    "outgoing_status": "Outgoing status should not be set for Incoming packages."
+                })
+        
+        elif package_type == 'Outgoing':
+            if not data.get('outgoing_status') and not getattr(self.instance, 'outgoing_status', None):
+                raise serializers.ValidationError({
+                    "outgoing_status": "Outgoing status (Sent or Return) is required for Outgoing packages."
+                })
+        
+        return data
 
     def update(self, instance, validated_data):
         details_data = validated_data.pop('details', None)
@@ -87,5 +142,45 @@ class PackageUpdateSerializer(serializers.ModelSerializer):
 
 
 class PackageStatusUpdateSerializer(serializers.Serializer):
-    package_status = serializers.ChoiceField(choices=Package.PackageStatus.choices, required=True)
+    package_type = serializers.ChoiceField(
+        choices=Package.PackageType.choices, 
+        required=True,
+        help_text="Package type: Incoming, Outgoing, or Delivered"
+    )
+    outgoing_status = serializers.ChoiceField(
+        choices=Package.OutgoingStatus.choices,
+        required=False,
+        allow_null=True,
+        help_text="Outgoing status (Sent or Return) - required only for Outgoing packages"
+    )
+    city = serializers.CharField(
+        max_length=100,
+        required=False,
+        allow_blank=True,
+        help_text="City name - required for Incoming packages"
+    )
     is_active = serializers.BooleanField(required=True)
+
+    def validate(self, data):
+        """
+        Validate based on package type.
+        """
+        package_type = data.get('package_type')
+        
+        if package_type == 'Incoming':
+            if not data.get('city'):
+                raise serializers.ValidationError({
+                    "city": "City is required when updating to Incoming type."
+                })
+            if data.get('outgoing_status'):
+                raise serializers.ValidationError({
+                    "outgoing_status": "Outgoing status cannot be set for Incoming packages."
+                })
+        
+        elif package_type == 'Outgoing':
+            if not data.get('outgoing_status'):
+                raise serializers.ValidationError({
+                    "outgoing_status": "Outgoing status (Sent or Return) is required for Outgoing packages."
+                })
+        
+        return data
