@@ -278,7 +278,7 @@ class ReturnPackageSerializer(serializers.Serializer):
 
 
 class OutgoingPackageSerializer(serializers.ModelSerializer):
-    """Serializer for Outgoing packages (both Send and Return)"""
+    """Serializer for Outgoing packages (both Send and Return) with camelCase field names"""
     details = PackageDetailsSerializer(read_only=True)
     
     class Meta:
@@ -286,5 +286,85 @@ class OutgoingPackageSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'tracking_id', 'service_provider', 'qbox', 
             'outgoing_status', 'shipment_status', 'created_at', 
-            'last_update', 'details'
+            'last_update', 'details', 'merchant_name', 'driver_name', 'city'
         ]
+
+
+class SendPackageResponseSerializer(serializers.ModelSerializer):
+    """Serializer for Send Package response with camelCase field names matching the payload"""
+    details = PackageDetailsSerializer(read_only=True)
+    
+    class Meta:
+        model = Package
+        fields = [
+            'id', 'tracking_id', 'merchant_name', 'service_provider', 
+            'driver_name', 'outgoing_status', 'shipment_status', 
+            'created_at', 'last_update', 'details', 'city', 'qbox'
+        ]
+    
+    def to_representation(self, instance):
+        """Convert snake_case to camelCase for the response"""
+        data = super().to_representation(instance)
+        
+        # Rename fields to camelCase
+        camel_case_data = {
+            'id': data.get('id'),
+            'trackingId': data.get('tracking_id'),
+            'merchantName': data.get('merchant_name'),
+            'serviceProvider': data.get('service_provider'),
+            'driverName': data.get('driver_name'),
+            'outgoingStatus': data.get('outgoing_status'),
+            'shipmentStatus': data.get('shipment_status'),
+            'createdAt': data.get('created_at'),
+            'lastUpdate': data.get('last_update'),
+            'packageType': data.get('details', {}).get('package_type') if data.get('details') else None,
+            'packageWeight': data.get('details', {}).get('package_weight') if data.get('details') else None,
+            'qboxImage': data.get('city') if data.get('city') and data.get('city').startswith('file://') else None,
+            'packageDescription': data.get('city') if data.get('city') and not data.get('city').startswith('file://') else None,
+            'packageItemValue': data.get('city').split()[1] if data.get('city') and len(data.get('city', '').split()) > 1 else None,
+            'currency': data.get('city').split()[2] if data.get('city') and len(data.get('city', '').split()) > 2 else None,
+        }
+        
+        return camel_case_data
+
+
+class ReturnPackageResponseSerializer(serializers.ModelSerializer):
+    """Serializer for Return Package response with camelCase field names matching the payload"""
+    details = PackageDetailsSerializer(read_only=True)
+    
+    class Meta:
+        model = Package
+        fields = [
+            'id', 'tracking_id', 'merchant_name', 
+            'outgoing_status', 'shipment_status', 
+            'created_at', 'last_update', 'details', 'driver_name', 'city'
+        ]
+    
+    def to_representation(self, instance):
+        """Convert snake_case to camelCase for the response"""
+        data = super().to_representation(instance)
+        
+        # Extract pinCode from driver_name if it exists
+        pin_code = None
+        if data.get('driver_name') and data.get('driver_name', '').startswith('PIN: '):
+            pin_code = data.get('driver_name', '').replace('PIN: ', '')
+        
+        # Rename fields to camelCase
+        camel_case_data = {
+            'id': data.get('id'),
+            'trackingId': data.get('tracking_id'),
+            'merchantName': data.get('merchant_name'),
+            'outgoingStatus': data.get('outgoing_status'),
+            'shipmentStatus': data.get('shipment_status'),
+            'createdAt': data.get('created_at'),
+            'lastUpdate': data.get('last_update'),
+            'packageType': data.get('details', {}).get('package_type') if data.get('details') else None,
+            'packageWeight': data.get('details', {}).get('package_weight') if data.get('details') else None,
+            'pinCode': pin_code,
+            'returnPackageImage': data.get('city') if data.get('city') and data.get('city').startswith('file://') else None,
+            'packageDescription': data.get('city') if data.get('city') and not data.get('city').startswith('file://') else None,
+            'packageItemValue': data.get('city').split()[1] if data.get('city') and len(data.get('city', '').split()) > 1 else None,
+            'currency': data.get('city').split()[2] if data.get('city') and len(data.get('city', '').split()) > 2 else None,
+        }
+        
+        return camel_case_data
