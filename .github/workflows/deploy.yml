@@ -12,11 +12,21 @@ jobs:
     steps:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          script: |
+    with:
+         host: ${{ secrets.VPS_HOST }}
+         username: ${{ secrets.VPS_USER }}
+         key: ${{ secrets.VPS_SSH_KEY }}  
+         script: |
+            cd /var/www/smart_locker
+            GIT_SSH_COMMAND="ssh -i ~/.ssh/id_ed25519_vps -o StrictHostKeyChecking=no" git fetch origin
+            GIT_SSH_COMMAND="ssh -i ~/.ssh/id_ed25519_vps -o StrictHostKeyChecking=no" git reset --hard origin/main
+            source venv/bin/activate
+            pip install -r requirements.txt
+            python manage.py migrate
+            python manage.py collectstatic --noinput
+            systemctl restart smart_locker
+            systemctl restart nginx
+         script: |
             cd /var/www/smart_locker
             git fetch origin
             git reset --hard origin/main
