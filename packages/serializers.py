@@ -189,7 +189,7 @@ class PackageStatusUpdateSerializer(serializers.Serializer):
 class SendPackageSerializer(serializers.Serializer):
     """Serializer for creating a Send Package with camelCase field names"""
     shippingCompany = serializers.CharField(max_length=100, required=True, help_text="Shipping company name")
-    qboxImage = serializers.URLField(required=True, help_text="URL of the package image")
+    qboxImage = serializers.CharField(max_length=500, required=True, help_text="URL or file path of the package image")
     packageDescription = serializers.CharField(required=True, help_text="Description of the package")
     packageItemValue = serializers.DecimalField(max_digits=10, decimal_places=2, required=True, help_text="Value of the package item")
     currency = serializers.CharField(max_length=10, required=True, help_text="Currency code (e.g., SAR)")
@@ -242,7 +242,7 @@ class SendPackageSerializer(serializers.Serializer):
 
 class ReturnPackageSerializer(serializers.Serializer):
     """Serializer for creating a Return Package with camelCase field names"""
-    returnPackageImage = serializers.URLField(required=True, help_text="URL of the return package image")
+    returnPackageImage = serializers.CharField(max_length=500, required=True, help_text="URL or file path of the return package image")
     packageDescription = serializers.CharField(required=True, help_text="Description of the return package")
     packageItemValue = serializers.DecimalField(max_digits=10, decimal_places=2, required=True, help_text="Value of the package item")
     currency = serializers.CharField(max_length=10, required=True, help_text="Currency code (e.g., SAR)")
