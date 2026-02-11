@@ -51,23 +51,60 @@ class StandardResultsPagination(PageNumberPagination):
 
 class PackageListAPIView(generics.ListAPIView):
     '''
-    Get: list all packages with pagination and filters
+    Get: List all packages with pagination and filters
+    
+    Query Parameters:
+    - search: Search by tracking_id, merchant_name, service_provider, driver_name
+    - ordering: Order by field (tracking_id, merchant_name, service_provider, driver_name, created_at, last_update, package_type, shipment_status)
+    - package_type: Filter by package type (Incoming, Outgoing, Delivered)
+    - outgoing_status: Filter by outgoing status (Sent, Return) - only applicable for Outgoing packages
     '''
     queryset = Package.objects.all()
     serializer_class = PackageSerializer
     permission_classes = [permissions.AllowAny]
     pagination_class = StandardResultsPagination
-    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter, filters.BaseFilterBackend]
     search_fields = ["tracking_id", "merchant_name", "service_provider", "driver_name"]
     ordering_fields = ["tracking_id", "merchant_name", "service_provider", "driver_name", "created_at", "last_update", "package_type", "shipment_status"]
     ordering = ["-created_at"]
-
+    
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        
+        # Filter by package_type
+        package_type = self.request.query_params.get('package_type')
+        if package_type:
+            queryset = queryset.filter(package_type=package_type)
+        
+        # Filter by outgoing_status (only for Outgoing packages)
+        outgoing_status = self.request.query_params.get('outgoing_status')
+        if outgoing_status:
+            queryset = queryset.filter(outgoing_status=outgoing_status)
+        
+        return queryset
+    
     @swagger_auto_schema(
         **swagger.list_operation(
             summary="List all packages",
-            description="Retrieve a paginated list of all packages with optional filtering by search query, ordering, and package type.",
+            description="Retrieve a paginated list of all packages with optional filtering by search query, ordering, package type, and outgoing status.",
             serializer=PackageSerializer
-        )
+        ),
+        manual_parameters=[
+            openapi.Parameter(
+                'package_type',
+                openapi.IN_QUERY,
+                description="Filter by package type (Incoming, Outgoing, Delivered)",
+                type=openapi.TYPE_STRING,
+                enum=Package.PackageType.choices
+            ),
+            openapi.Parameter(
+                'outgoing_status',
+                openapi.IN_QUERY,
+                description="Filter by outgoing status (Sent, Return) - only for Outgoing packages",
+                type=openapi.TYPE_STRING,
+                enum=Package.OutgoingStatus.choices
+            ),
+        ]
     )
     def get_paginated_response(self, data):
         return Response({
@@ -302,19 +339,40 @@ class SendPackageAPIView(generics.CreateAPIView):
     '''
     Post: Create a new send package (outgoing package with 'Sent' status)
     
-    Payload:
+    This endpoint creates an outgoing package with outgoing_status set to 'Sent'.
+    The package will be of type 'Outgoing' and can be filtered using package_type=Outgoing
+    with outgoing_status=Sent in the packages list API.
+    
+    Request Body (camelCase field names):
     {
         "shippingCompany": "mainDoor",
-        "qboxImage": "file:///data/user/0/host.exp.exponent/cache/ImagePicker/390808c2-8678-47cb-9502-dd7661e11b33.jpeg",
-        "packageDescription": "This is the descrition",
-        "packageItemValue": 5,
+        "qboxImage": "https://example.com/image.jpeg",
+        "packageDescription": "This is the description",
+        "packageItemValue": 5.00,
         "currency": "sar",
-        "packageWeight": 2,
+        "packageWeight": 2.5,
         "packageType": "mainDoor",
-        "qBoxId": "345345",
+        "qBoxId": "QBOX001",
         "phone": "+923434534533",
-        "email": "sardar@gmail.com",
-        "fullName": "Sardar Hussain"
+        "email": "sender@example.com",
+        "fullName": "John Doe",
+        "merchantName": "Merchant Name"
+    }
+    
+    Response:
+    {
+        "success": true,
+        "statusCode": 201,
+        "data": {
+            "id": "uuid",
+            "tracking_id": "SND-ABC12345",
+            "merchant_name": "John Doe",
+            "service_provider": "mainDoor",
+            "outgoing_status": "Sent",
+            "package_type": "Outgoing",
+            ...
+        },
+        "message": "Send package created successfully"
     }
     '''
     queryset = Package.objects.all()
@@ -323,30 +381,89 @@ class SendPackageAPIView(generics.CreateAPIView):
 
     @swagger_auto_schema(
         operation_summary="[Package] Create send package",
-        operation_description="Create a new outgoing package with 'Sent' status",
+        operation_description="""Create a new outgoing package with 'Sent' status.
+        
+        This endpoint is used to send a package from a QBox location. The package will:
+        - Have package_type set to 'Outgoing'
+        - Have outgoing_status set to 'Sent'
+        - Be retrievable via the main packages list API with ?package_type=Outgoing&outgoing_status=Sent
+        
+        Required fields: shipping_company, package_description, package_weight, package_type, qbox_id
+        Optional fields: qbox_image, package_item_value, currency, phone, email, full_name, merchant_name
+        """,
         tags=["Package"],
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
-            required=["shippingCompany", "qboxImage", "packageDescription", "packageItemValue", 
-                      "currency", "packageWeight", "packageType", "qBoxId", "phone", "email", "fullName"],
+            required=["shipping_company", "package_description", "package_weight", "package_type", "qbox_id"],
             properties={
-                "shippingCompany": openapi.Schema(type=openapi.TYPE_STRING, description="Shipping company name"),
-                "qboxImage": openapi.Schema(type=openapi.TYPE_STRING, format=openapi.FORMAT_URI, description="URL of the package image"),
-                "packageDescription": openapi.Schema(type=openapi.TYPE_STRING, description="Description of the package"),
-                "packageItemValue": openapi.Schema(type=openapi.TYPE_NUMBER, description="Value of the package item"),
-                "currency": openapi.Schema(type=openapi.TYPE_STRING, description="Currency code (e.g., SAR)"),
-                "packageWeight": openapi.Schema(type=openapi.TYPE_NUMBER, description="Weight of the package"),
-                "packageType": openapi.Schema(type=openapi.TYPE_STRING, description="Type of package"),
-                "qBoxId": openapi.Schema(type=openapi.TYPE_STRING, description="QBox ID"),
-                "phone": openapi.Schema(type=openapi.TYPE_STRING, description="Contact phone number"),
-                "email": openapi.Schema(type=openapi.TYPE_STRING, format=openapi.FORMAT_EMAIL, description="Contact email"),
-                "fullName": openapi.Schema(type=openapi.TYPE_STRING, description="Full name of the sender"),
+                "shipping_company": openapi.Schema(
+                    type=openapi.TYPE_STRING, 
+                    description="Shipping company name",
+                    example="mainDoor"
+                ),
+                "qbox_image": openapi.Schema(
+                    type=openapi.TYPE_STRING, 
+                    format=openapi.FORMAT_URI, 
+                    description="URL of the package image",
+                    example="https://example.com/image.jpeg"
+                ),
+                "package_description": openapi.Schema(
+                    type=openapi.TYPE_STRING, 
+                    description="Description of the package",
+                    example="This is the package description"
+                ),
+                "package_item_value": openapi.Schema(
+                    type=openapi.TYPE_NUMBER, 
+                    description="Value of the package item",
+                    example=5.00
+                ),
+                "currency": openapi.Schema(
+                    type=openapi.TYPE_STRING, 
+                    description="Currency code (e.g., SAR, USD)",
+                    example="SAR"
+                ),
+                "package_weight": openapi.Schema(
+                    type=openapi.TYPE_NUMBER, 
+                    description="Weight of the package (kg)",
+                    example=2.5
+                ),
+                "package_type": openapi.Schema(
+                    type=openapi.TYPE_STRING, 
+                    description="Type of package",
+                    example="mainDoor"
+                ),
+                "qbox_id": openapi.Schema(
+                    type=openapi.TYPE_STRING, 
+                    description="QBox ID where the package is being sent from",
+                    example="QBOX001"
+                ),
+                "phone": openapi.Schema(
+                    type=openapi.TYPE_STRING, 
+                    description="Contact phone number",
+                    example="+923434534533"
+                ),
+                "email": openapi.Schema(
+                    type=openapi.TYPE_STRING, 
+                    format=openapi.FORMAT_EMAIL, 
+                    description="Contact email",
+                    example="sender@example.com"
+                ),
+                "full_name": openapi.Schema(
+                    type=openapi.TYPE_STRING, 
+                    description="Full name of the sender",
+                    example="John Doe"
+                ),
+                "merchant_name": openapi.Schema(
+                    type=openapi.TYPE_STRING, 
+                    description="Merchant name",
+                    example="Merchant Name"
+                ),
             }
         ),
         responses={
             201: create_success_response(
                 get_serializer_schema(PackageSerializer),
-                description="Send package created successfully"
+                description="Send package created successfully. Returns the created package with tracking ID."
             ),
             400: ValidationErrorResponse,
         }
@@ -376,15 +493,36 @@ class ReturnPackageAPIView(generics.CreateAPIView):
     '''
     Post: Create a new return package (outgoing package with 'Return' status)
     
-    Payload:
+    This endpoint creates an outgoing package with outgoing_status set to 'Return'.
+    The package will be of type 'Outgoing' and can be filtered using package_type=Outgoing
+    with outgoing_status=Return in the packages list API.
+    
+    Request Body (snake_case field names):
     {
-        "returnPackageImage": "file:///data/user/0/host.exp.exponent/cache/ImagePicker/124282a4-d02b-40f6-a767-fba00bbddc42.jpeg",
-        "packageDescription": "This is the description for the return package",
-        "packageItemValue": 8,
+        "return_package_image": "https://example.com/image.jpeg",
+        "package_description": "This is the description for the return package",
+        "package_item_value": 8.00,
         "currency": "sar",
-        "packageWeight": 3,
-        "packageType": "mainDoor",
-        "pinCode": "1231"
+        "package_weight": 3.0,
+        "package_type": "mainDoor",
+        "pin_code": "123456",
+        "qbox_id": "QBOX001",
+        "merchant_name": "Merchant Name"
+    }
+    
+    Response:
+    {
+        "success": true,
+        "statusCode": 201,
+        "data": {
+            "id": "uuid",
+            "tracking_id": "RET-ABC12345",
+            "merchant_name": "Merchant Name",
+            "outgoing_status": "Return",
+            "package_type": "Outgoing",
+            ...
+        },
+        "message": "Return package created successfully"
     }
     '''
     queryset = Package.objects.all()
@@ -393,26 +531,73 @@ class ReturnPackageAPIView(generics.CreateAPIView):
 
     @swagger_auto_schema(
         operation_summary="[Package] Create return package",
-        operation_description="Create a new outgoing package with 'Return' status",
+        operation_description="""Create a new outgoing package with 'Return' status.
+        
+        This endpoint is used to return a package to a QBox location. The package will:
+        - Have package_type set to 'Outgoing'
+        - Have outgoing_status set to 'Return'
+        - Be retrievable via the main packages list API with ?package_type=Outgoing&outgoing_status=Return
+        
+        Required fields: package_description, package_weight, package_type
+        Optional fields: return_package_image, package_item_value, currency, pin_code, qbox_id, merchant_name
+        """,
         tags=["Package"],
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
-            required=["returnPackageImage", "packageDescription", "packageItemValue", 
-                      "currency", "packageWeight", "packageType", "pinCode"],
+            required=["package_description", "package_weight", "package_type"],
             properties={
-                "returnPackageImage": openapi.Schema(type=openapi.TYPE_STRING, format=openapi.FORMAT_URI, description="URL of the return package image"),
-                "packageDescription": openapi.Schema(type=openapi.TYPE_STRING, description="Description of the return package"),
-                "packageItemValue": openapi.Schema(type=openapi.TYPE_NUMBER, description="Value of the package item"),
-                "currency": openapi.Schema(type=openapi.TYPE_STRING, description="Currency code (e.g., SAR)"),
-                "packageWeight": openapi.Schema(type=openapi.TYPE_NUMBER, description="Weight of the package"),
-                "packageType": openapi.Schema(type=openapi.TYPE_STRING, description="Type of package"),
-                "pinCode": openapi.Schema(type=openapi.TYPE_STRING, description="PIN code for return"),
+                "return_package_image": openapi.Schema(
+                    type=openapi.TYPE_STRING, 
+                    format=openapi.FORMAT_URI, 
+                    description="URL of the return package image",
+                    example="https://example.com/image.jpeg"
+                ),
+                "package_description": openapi.Schema(
+                    type=openapi.TYPE_STRING, 
+                    description="Description of the return package",
+                    example="This is the description for the return package"
+                ),
+                "package_item_value": openapi.Schema(
+                    type=openapi.TYPE_NUMBER, 
+                    description="Value of the package item",
+                    example=8.00
+                ),
+                "currency": openapi.Schema(
+                    type=openapi.TYPE_STRING, 
+                    description="Currency code (e.g., SAR, USD)",
+                    example="SAR"
+                ),
+                "package_weight": openapi.Schema(
+                    type=openapi.TYPE_NUMBER, 
+                    description="Weight of the package (kg)",
+                    example=3.0
+                ),
+                "package_type": openapi.Schema(
+                    type=openapi.TYPE_STRING, 
+                    description="Type of package",
+                    example="mainDoor"
+                ),
+                "pin_code": openapi.Schema(
+                    type=openapi.TYPE_STRING, 
+                    description="PIN code for return verification",
+                    example="123456"
+                ),
+                "qbox_id": openapi.Schema(
+                    type=openapi.TYPE_STRING, 
+                    description="QBox ID associated with the return",
+                    example="QBOX001"
+                ),
+                "merchant_name": openapi.Schema(
+                    type=openapi.TYPE_STRING, 
+                    description="Merchant or sender name",
+                    example="Merchant Name"
+                ),
             }
         ),
         responses={
             201: create_success_response(
                 get_serializer_schema(PackageSerializer),
-                description="Return package created successfully"
+                description="Return package created successfully. Returns the created package with tracking ID."
             ),
             400: ValidationErrorResponse,
         }
@@ -441,24 +626,59 @@ class ReturnPackageAPIView(generics.CreateAPIView):
 class OutgoingPackagesAPIView(generics.ListAPIView):
     '''
     Get: List all outgoing packages (includes both Send and Return packages)
+    
+    This endpoint retrieves all packages with package_type='Outgoing', which includes:
+    - Send packages (outgoing_status='Sent')
+    - Return packages (outgoing_status='Return')
+    
+    Query Parameters:
+    - search: Search by tracking_id, service_provider, outgoing_status
+    - ordering: Order by field (tracking_id, created_at, last_update, shipment_status)
+    - outgoing_status: Filter by outgoing status (Sent or Return)
     '''
     queryset = Package.objects.filter(package_type='Outgoing')
     serializer_class = OutgoingPackageSerializer
     permission_classes = [permissions.AllowAny]
     pagination_class = StandardResultsPagination
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-    search_fields = ['tracking_id', 'service_provider', 'outgoing_status']
+    search_fields = ['tracking_id', 'service_provider', 'outgoing_status', 'merchant_name']
     ordering_fields = ['tracking_id', 'created_at', 'last_update', 'shipment_status']
     ordering = ['-created_at']
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        
+        # Filter by outgoing_status (Sent or Return)
+        outgoing_status = self.request.query_params.get('outgoing_status')
+        if outgoing_status:
+            queryset = queryset.filter(outgoing_status=outgoing_status)
+        
+        return queryset
+    
     @swagger_auto_schema(
         operation_summary="[Package] List outgoing packages",
-        operation_description="Retrieve a paginated list of all outgoing packages (Send and Return)",
+        operation_description="""Retrieve a paginated list of all outgoing packages.
+        
+        This includes both:
+        - Send packages (outgoing_status='Sent') - created via POST /packages/send
+        - Return packages (outgoing_status='Return') - created via POST /packages/return
+        
+        Filter by outgoing_status to get only Send or Return packages.
+        """,
         tags=["Package"],
+        manual_parameters=[
+            openapi.Parameter(
+                'outgoing_status',
+                openapi.IN_QUERY,
+                description="Filter by outgoing status (Sent, Return)",
+                type=openapi.TYPE_STRING,
+                enum=Package.OutgoingStatus.choices
+            ),
+        ],
         responses={
             200: create_success_response(
                 get_serializer_schema(OutgoingPackageSerializer, many=True),
-                description="Outgoing packages retrieved successfully"
+                description="Outgoing packages retrieved successfully. Returns list of all outgoing packages."
             ),
         }
     )
