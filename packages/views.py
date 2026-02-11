@@ -403,8 +403,7 @@ class SendPackageAPIView(generics.CreateAPIView):
                 ),
                 "qboxImage": openapi.Schema(
                     type=openapi.TYPE_STRING, 
-                    format=openapi.FORMAT_URI, 
-                    description="URL of the package image",
+                    description="URL or file path of the package image",
                     example="file:///data/user/0/host.exp.exponent/cache/ImagePicker/390808c2-8678-47cb-9502-dd7661e11b33.jpeg"
                 ),
                 "packageDescription": openapi.Schema(
@@ -541,8 +540,7 @@ class ReturnPackageAPIView(generics.CreateAPIView):
             properties={
                 "returnPackageImage": openapi.Schema(
                     type=openapi.TYPE_STRING, 
-                    format=openapi.FORMAT_URI, 
-                    description="URL of the return package image",
+                    description="URL or file path of the return package image",
                     example="file:///data/user/0/host.exp.exponent/cache/ImagePicker/124282a4-d02b-40f6-a767-fba00bbddc42.jpeg"
                 ),
                 "packageDescription": openapi.Schema(
