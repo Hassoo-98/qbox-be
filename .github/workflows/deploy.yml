@@ -10,13 +10,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Checkout the code (needed if you want to run anything on runner)
       - name: Checkout code
         uses: actions/checkout@v4
-
-      # Step 2: Deploy via SSH
       - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.7.0
+        uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
@@ -24,15 +21,15 @@ jobs:
           port: 22
           script: |
             cd /var/www/smart_locker
-            # Use the specific SSH key for Git pull
+            # Pull latest code over SSH key on VPS
             GIT_SSH_COMMAND="ssh -i ~/.ssh/id_ed25519_vps -o StrictHostKeyChecking=no" git fetch origin
             GIT_SSH_COMMAND="ssh -i ~/.ssh/id_ed25519_vps -o StrictHostKeyChecking=no" git reset --hard origin/main
-            # Activate virtualenv
+            # Activate virtualenv (if exists)
             source venv/bin/activate
             # Install dependencies
             pip install -r requirements.txt
-            # Run migrations
-            python manage.py migrate
+            # Run Django migrations
+            python manage.py migrate --noinput
             # Collect static files
             python manage.py collectstatic --noinput
             # Restart services
