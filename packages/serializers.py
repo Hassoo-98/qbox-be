@@ -187,26 +187,25 @@ class PackageStatusUpdateSerializer(serializers.Serializer):
 
 
 class SendPackageSerializer(serializers.Serializer):
-    """Serializer for creating a Send Package"""
-    shipping_company = serializers.CharField(max_length=100, required=True, help_text="Shipping company name")
-    qbox_image = serializers.URLField(required=False, allow_blank=True, help_text="URL of the package image")
-    package_description = serializers.CharField(required=True, help_text="Description of the package")
-    package_item_value = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, help_text="Value of the package item")
-    currency = serializers.CharField(max_length=10, required=False, help_text="Currency code (e.g., SAR)")
-    package_weight = serializers.DecimalField(max_digits=10, decimal_places=2, required=True, help_text="Weight of the package")
-    package_type = serializers.CharField(max_length=50, required=True, help_text="Type of package")
-    qbox_id = serializers.CharField(max_length=50, required=True, help_text="QBox ID")
-    phone = serializers.CharField(max_length=20, required=False, help_text="Contact phone number")
-    email = serializers.EmailField(required=False, help_text="Contact email")
-    full_name = serializers.CharField(max_length=100, required=False, help_text="Full name of the sender")
-    merchant_name = serializers.CharField(max_length=100, required=False, help_text="Merchant name")
+    """Serializer for creating a Send Package with camelCase field names"""
+    shippingCompany = serializers.CharField(max_length=100, required=True, help_text="Shipping company name")
+    qboxImage = serializers.URLField(required=True, help_text="URL of the package image")
+    packageDescription = serializers.CharField(required=True, help_text="Description of the package")
+    packageItemValue = serializers.DecimalField(max_digits=10, decimal_places=2, required=True, help_text="Value of the package item")
+    currency = serializers.CharField(max_length=10, required=True, help_text="Currency code (e.g., SAR)")
+    packageWeight = serializers.DecimalField(max_digits=10, decimal_places=2, required=True, help_text="Weight of the package")
+    packageType = serializers.CharField(max_length=50, required=True, help_text="Type of package")
+    qBoxId = serializers.CharField(max_length=50, required=True, help_text="QBox ID")
+    phone = serializers.CharField(max_length=20, required=True, help_text="Contact phone number")
+    email = serializers.EmailField(required=True, help_text="Contact email")
+    fullName = serializers.CharField(max_length=100, required=True, help_text="Full name of the sender")
 
     def create(self, validated_data):
         """Create a new outgoing package with 'Sent' status"""
         from q_box.models import Qbox
         
         # Extract QBox ID and get the QBox object
-        qbox_id = validated_data.pop('qbox_id', None)
+        qbox_id = validated_data.pop('qBoxId', None)
         qbox = None
         if qbox_id:
             try:
@@ -216,82 +215,64 @@ class SendPackageSerializer(serializers.Serializer):
         
         # Create PackageDetails for the package
         details_data = {
-            'package_type': validated_data.pop('package_type', ''),
-            'package_weight': str(validated_data.pop('package_weight', '')),
+            'package_type': validated_data.pop('packageType', ''),
+            'package_weight': str(validated_data.pop('packageWeight', '')),
         }
         details = PackageDetails.objects.create(**details_data)
         
         # Auto-generate tracking_id
         tracking_id = f"SND-{str(uuid.uuid4())[:8].upper()}"
         
-        # Extract merchant name from full_name or use provided value
-        merchant_name = validated_data.pop('merchant_name', '') or validated_data.pop('full_name', '')
-        
         # Create the package as Outgoing with Sent status
         package = Package.objects.create(
             tracking_id=tracking_id,
-            merchant_name=merchant_name,
-            service_provider=validated_data.pop('shipping_company', ''),
+            merchant_name=validated_data.pop('fullName', ''),
+            service_provider=validated_data.pop('shippingCompany', ''),
             outgoing_status='Sent',
             package_type='Outgoing',
             shipment_status=Package.ShipmentStatus.SHIPMENT_CREATED,
             details=details,
             qbox=qbox,
-            # Store additional info in merchant_name or as notes if needed
-            driver_name=validated_data.pop('full_name', '') if validated_data.get('full_name') else '',
+            driver_name=validated_data.pop('fullName', ''),
+            # Store additional info in city field as it's not used for outgoing
+            city=f"Value: {validated_data.pop('packageItemValue', '')} {validated_data.pop('currency', '')}",
         )
         return package
 
 
 class ReturnPackageSerializer(serializers.Serializer):
-    """Serializer for creating a Return Package"""
-    return_package_image = serializers.URLField(required=False, allow_blank=True, help_text="URL of the return package image")
-    package_description = serializers.CharField(required=True, help_text="Description of the return package")
-    package_item_value = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, help_text="Value of the package item")
-    currency = serializers.CharField(max_length=10, required=False, help_text="Currency code (e.g., SAR)")
-    package_weight = serializers.DecimalField(max_digits=10, decimal_places=2, required=True, help_text="Weight of the package")
-    package_type = serializers.CharField(max_length=50, required=True, help_text="Type of package")
-    pin_code = serializers.CharField(max_length=20, required=False, help_text="PIN code for return")
-    qbox_id = serializers.CharField(max_length=50, required=False, help_text="QBox ID")
-    merchant_name = serializers.CharField(max_length=100, required=False, help_text="Merchant or sender name")
+    """Serializer for creating a Return Package with camelCase field names"""
+    returnPackageImage = serializers.URLField(required=True, help_text="URL of the return package image")
+    packageDescription = serializers.CharField(required=True, help_text="Description of the return package")
+    packageItemValue = serializers.DecimalField(max_digits=10, decimal_places=2, required=True, help_text="Value of the package item")
+    currency = serializers.CharField(max_length=10, required=True, help_text="Currency code (e.g., SAR)")
+    packageWeight = serializers.DecimalField(max_digits=10, decimal_places=2, required=True, help_text="Weight of the package")
+    packageType = serializers.CharField(max_length=50, required=True, help_text="Type of package")
+    pinCode = serializers.CharField(max_length=20, required=True, help_text="PIN code for return")
 
     def create(self, validated_data):
         """Create a new outgoing package with 'Return' status"""
-        from q_box.models import Qbox
-        
-        # Extract QBox ID and get the QBox object
-        qbox_id = validated_data.pop('qbox_id', None)
-        qbox = None
-        if qbox_id:
-            try:
-                qbox = Qbox.objects.get(qbox_id=qbox_id)
-            except Qbox.DoesNotExist:
-                pass
-        
         # Create PackageDetails for the package
         details_data = {
-            'package_type': validated_data.pop('package_type', ''),
-            'package_weight': str(validated_data.pop('package_weight', '')),
+            'package_type': validated_data.pop('packageType', ''),
+            'package_weight': str(validated_data.pop('packageWeight', '')),
         }
         details = PackageDetails.objects.create(**details_data)
         
         # Auto-generate tracking_id
         tracking_id = f"RET-{str(uuid.uuid4())[:8].upper()}"
         
-        # Extract merchant name
-        merchant_name = validated_data.pop('merchant_name', '')
-        
         # Create the package as Outgoing with Return status
         package = Package.objects.create(
             tracking_id=tracking_id,
-            merchant_name=merchant_name,
             outgoing_status='Return',
             package_type='Outgoing',
             shipment_status=Package.ShipmentStatus.SHIPMENT_CREATED,
             details=details,
-            qbox=qbox,
             # Store PIN code in driver_name field as it's not used for return packages
-            driver_name=validated_data.pop('pin_code', '') if validated_data.get('pin_code') else '',
+            driver_name=f"PIN: {validated_data.pop('pinCode', '')}",
+            # Store package value and currency in city field as it's not used for outgoing
+            city=f"Value: {validated_data.pop('packageItemValue', '')} {validated_data.pop('currency', '')}",
         )
         return package
 
