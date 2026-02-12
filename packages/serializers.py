@@ -141,7 +141,7 @@ class OutgoingPackageSerializer(serializers.Serializer):
     def get_paymentSummary(self, obj):
         """Build payment summary for outgoing packages"""
         return {
-            "paymentMethod": "Cash on Delivery",
+            "paymentMethod": "Apple Pay",
             "charges": [
                 {"key": "Base delivery fee (First 5 Kg's)", "value": 5},
                 {"key": "Additional per Kg", "value": 10},
@@ -208,7 +208,9 @@ class PackageCreateSerializer(serializers.ModelSerializer):
         fields = [
             "qbox", "tracking_id", "merchant_name",
             "service_provider", "driver_name", "qr_code",
-            "package_type", "outgoing_status", "city", "details"
+            "package_type", "outgoing_status", "city", 
+            "item_value", "recipient_name", "recipient_phone", 
+            "recipient_email", "description", "details"
         ]
         extra_kwargs = {
             "tracking_id": {"required": False, "allow_blank": True}
