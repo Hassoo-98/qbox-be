@@ -36,7 +36,7 @@ class PackageTimeListItemView(APIView):
     )
 
     def get(self,request):
-        timelines=PackageTimeline.objects.all().order_by("-id")
+        timelines=PackageTimeline.objects.all().order_by("-date_and_time")
         paginator=self.pagination_class()
         paginated_qs = paginator.paginate_queryset(timelines, request)
         serializer = PackageTimelineSerializer(paginated_qs, many=True)
@@ -80,7 +80,10 @@ class PackageTimelineDetailView(APIView):
     """
     permission_classes=[permission.AllowAny]
     def get_object(self,pk):
-        return get_object_or_404(PackageTimeline, id=pk)
+        try:
+            return get_object_or_404(PackageTimeline, id=uuid.UUID(pk))
+        except (ValueError, TypeError):
+            return None
     @swagger_auto_schema(
         **swagger.retrieve_operation(
             summary="Retrieve Package Timeline",
@@ -89,6 +92,12 @@ class PackageTimelineDetailView(APIView):
     )
     def get(self,request,pk):
         timeline=self.get_object(pk)
+        if timeline is None:
+            return Response({
+                "success":False,
+                "statusCode":status.HTTP_400_BAD_REQUEST,
+                "message":"Invalid timeline ID format"
+            },status=status.HTTP_400_BAD_REQUEST)
         serializer=PackageTimelineSerializer(timeline)
         return Response({
             "success":True,
@@ -104,6 +113,12 @@ class PackageTimelineDetailView(APIView):
     )
     def delete(self,request,pk):
         timeline=self.get_object(pk)
+        if timeline is None:
+            return Response({
+                "success":False,
+                "statusCode":status.HTTP_400_BAD_REQUEST,
+                "message":"Invalid timeline ID format"
+            },status=status.HTTP_400_BAD_REQUEST)
         timeline.delete()
         return Response({
             "success":True,
