@@ -11,6 +11,9 @@ from .views import (
     OutgoingPackagesAPIView,
     DeliveredPackagesAPIView,
     IncomingPackagesAPIView,
+    IncomingPackageDetailAPIView,
+    OutgoingPackageDetailAPIView,
+    DeliveredPackageDetailAPIView,
 )
 
 # NOTE: The order of URL patterns matters!
@@ -30,6 +33,15 @@ urlpatterns = [
     path('outgoing/', OutgoingPackagesAPIView.as_view(), name='packages-outgoing'),
     path('delivered/', DeliveredPackagesAPIView.as_view(), name='packages-delivered'),
     path('incoming/', IncomingPackagesAPIView.as_view(), name='packages-incoming'),
+    
+    # Incoming package detail (MUST come before <uuid:id> pattern)
+    path('incoming/<uuid:id>/', IncomingPackageDetailAPIView.as_view(), name='incoming-package-detail'),
+    
+    # Outgoing package detail (MUST come before <uuid:id> pattern)
+    path('outgoing/<uuid:id>/', OutgoingPackageDetailAPIView.as_view(), name='outgoing-package-detail'),
+    
+    # Delivered package detail (MUST come before <uuid:id> pattern)
+    path('delivered/<uuid:id>/', DeliveredPackageDetailAPIView.as_view(), name='delivered-package-detail'),
     
     # Individual package operations (MUST come after filtered endpoints)
     path('<uuid:id>/', PackageDetailAPIView.as_view(), name='package-detail'),

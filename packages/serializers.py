@@ -29,6 +29,177 @@ class PackageListSerializer(serializers.ModelSerializer):
             "package_type", "outgoing_status", "shipment_status", "created_at"
         ]
 
+
+class IncomingPackageSerializer(serializers.Serializer):
+    """Serializer for incoming package detail response matching frontend requirements"""
+    id = serializers.UUIDField()
+    trackingId = serializers.CharField(source="tracking_id")
+    type = serializers.SerializerMethodField()
+    courierName = serializers.CharField(source="service_provider")
+    lastUpdate = serializers.DateTimeField(source="last_update")
+    qrCode = serializers.CharField(source="qr_code")
+    description = serializers.CharField()
+    imageUrl = serializers.SerializerMethodField()
+    attributes = serializers.SerializerMethodField()
+
+    def get_type(self, obj):
+        return "PACKAGE_TYPE.INCOMING"
+
+    def get_imageUrl(self, obj):
+        # Return a default image URL or the actual image if available
+        return "https://example.com/images/packageItem.jpg"
+
+    def get_attributes(self, obj):
+        """Build attributes list from package details"""
+        attributes = []
+        
+        # Add package type if available
+        if hasattr(obj, 'details') and obj.details:
+            if obj.details.package_type:
+                attributes.append({
+                    "type": "Package Type",
+                    "value": obj.details.package_type
+                })
+            if obj.details.package_weight:
+                attributes.append({
+                    "type": "Package Weight",
+                    "value": obj.details.package_weight
+                })
+        
+        # Add item value if available
+        if hasattr(obj, 'item_value') and obj.item_value:
+            attributes.append({
+                "type": "Item Value",
+                "value": str(obj.item_value)
+            })
+        
+        # If no details, return default attributes
+        if not attributes:
+            attributes = [
+                {"type": "Package Type", "value": "General"},
+                {"type": "Item Value", "value": "0"},
+                {"type": "Package Weight", "value": "1 kg"},
+            ]
+        
+        return attributes
+
+
+class OutgoingPackageSerializer(serializers.Serializer):
+    """Serializer for outgoing package detail response matching frontend requirements"""
+    id = serializers.UUIDField()
+    type = serializers.SerializerMethodField()
+    trackingId = serializers.CharField(source="tracking_id")
+    courierName = serializers.CharField(source="service_provider")
+    lastUpdate = serializers.DateTimeField(source="last_update")
+    qrCode = serializers.CharField(source="qr_code")
+    status = serializers.CharField(source="outgoing_status")
+    phoneNumber = serializers.CharField(source="recipient_phone")
+    email = serializers.EmailField(source="recipient_email")
+    recepientName = serializers.CharField(source="recipient_name")
+    description = serializers.CharField()
+    imageUrl = serializers.SerializerMethodField()
+    attributes = serializers.SerializerMethodField()
+    paymentSummary = serializers.SerializerMethodField()
+
+    def get_type(self, obj):
+        return "PACKAGE_TYPE.OUTGOING"
+
+    def get_imageUrl(self, obj):
+        return "https://example.com/images/packageItem.jpg"
+
+    def get_attributes(self, obj):
+        """Build attributes list from package details"""
+        attributes = []
+        
+        if hasattr(obj, 'details') and obj.details:
+            if obj.details.package_type:
+                attributes.append({
+                    "type": "Package Type",
+                    "value": obj.details.package_type
+                })
+            if obj.details.package_weight:
+                attributes.append({
+                    "type": "Package Weight",
+                    "value": obj.details.package_weight
+                })
+        
+        if hasattr(obj, 'item_value') and obj.item_value:
+            attributes.append({
+                "type": "Item Value",
+                "value": str(obj.item_value)
+            })
+        
+        if not attributes:
+            attributes = [
+                {"type": "Package Type", "value": "General"},
+                {"type": "Item Value", "value": "0"},
+                {"type": "Package Weight", "value": "1 kg"},
+            ]
+        
+        return attributes
+
+    def get_paymentSummary(self, obj):
+        """Build payment summary for outgoing packages"""
+        return {
+            "paymentMethod": "Cash on Delivery",
+            "charges": [
+                {"key": "Base delivery fee (First 5 Kg's)", "value": 5},
+                {"key": "Additional per Kg", "value": 10},
+                {"key": "Tax Fuel", "value": 5},
+            ],
+            "currency": "SAR"
+        }
+
+
+class DeliveredPackageSerializer(serializers.Serializer):
+    """Serializer for delivered package detail response matching frontend requirements"""
+    id = serializers.UUIDField()
+    type = serializers.SerializerMethodField()
+    trackingId = serializers.CharField(source="tracking_id")
+    courierName = serializers.CharField(source="service_provider")
+    lastUpdate = serializers.DateTimeField(source="last_update")
+    qrCode = serializers.CharField(source="qr_code")
+    description = serializers.CharField()
+    imageUrl = serializers.SerializerMethodField()
+    attributes = serializers.SerializerMethodField()
+
+    def get_type(self, obj):
+        return "PACKAGE_TYPE.DELIVERED"
+
+    def get_imageUrl(self, obj):
+        return "https://example.com/images/packageItem.jpg"
+
+    def get_attributes(self, obj):
+        """Build attributes list from package details"""
+        attributes = []
+        
+        if hasattr(obj, 'details') and obj.details:
+            if obj.details.package_type:
+                attributes.append({
+                    "type": "Package Type",
+                    "value": obj.details.package_type
+                })
+            if obj.details.package_weight:
+                attributes.append({
+                    "type": "Package Weight",
+                    "value": obj.details.package_weight
+                })
+        
+        if hasattr(obj, 'item_value') and obj.item_value:
+            attributes.append({
+                "type": "Item Value",
+                "value": str(obj.item_value)
+            })
+        
+        if not attributes:
+            attributes = [
+                {"type": "Package Type", "value": "General"},
+                {"type": "Item Value", "value": "0"},
+                {"type": "Package Weight", "value": "1 kg"},
+            ]
+        
+        return attributes
+
 class PackageCreateSerializer(serializers.ModelSerializer):
     details = PackageDetailsSerializer(required=False)
     

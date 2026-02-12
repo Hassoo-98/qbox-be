@@ -16,6 +16,9 @@ from .serializers import (
     OutgoingPackageSerializer,
     SendPackageResponseSerializer,
     ReturnPackageResponseSerializer,
+    IncomingPackageSerializer,
+    OutgoingPackageSerializer,
+    DeliveredPackageSerializer,
 )
 from utils.swagger_schema import (
     SwaggerHelper,
@@ -213,6 +216,111 @@ class PackageDetailAPIView(generics.RetrieveAPIView):
             "data": serializer.data,
             "message": "Get Package"
         }, status=status.HTTP_200_OK)
+
+
+class IncomingPackageDetailAPIView(generics.RetrieveAPIView):
+    '''
+    Get: Retrieve a single incoming package with formatted response
+    '''
+    queryset = Package.objects.filter(package_type=Package.PackageType.INCOMING)
+    serializer_class = IncomingPackageSerializer
+    permission_classes = [permissions.AllowAny]
+    lookup_field = "id"
+
+    @swagger_auto_schema(
+        **swagger.retrieve_operation(
+            summary="Get incoming package details",
+            description="Retrieve detailed information about a specific incoming package with formatted response.",
+            serializer=IncomingPackageSerializer
+        )
+    )
+    def get(self, request, *args, **kwargs):
+        try:
+            instance = self.get_object()
+            serializer = self.get_serializer(instance)
+            return Response({
+                "success": True,
+                "statusCode": status.HTTP_200_OK,
+                "data": serializer.data,
+                "message": "Get Incoming Package"
+            }, status=status.HTTP_200_OK)
+        except Package.DoesNotExist:
+            return Response({
+                "success": False,
+                "statusCode": status.HTTP_404_NOT_FOUND,
+                "data": None,
+                "message": "Incoming package not found"
+            }, status=status.HTTP_404_NOT_FOUND)
+
+
+class OutgoingPackageDetailAPIView(generics.RetrieveAPIView):
+    '''
+    Get: Retrieve a single outgoing package with formatted response
+    '''
+    queryset = Package.objects.filter(package_type=Package.PackageType.OUTGOING)
+    serializer_class = OutgoingPackageSerializer
+    permission_classes = [permissions.AllowAny]
+    lookup_field = "id"
+
+    @swagger_auto_schema(
+        **swagger.retrieve_operation(
+            summary="Get outgoing package details",
+            description="Retrieve detailed information about a specific outgoing package with formatted response.",
+            serializer=OutgoingPackageSerializer
+        )
+    )
+    def get(self, request, *args, **kwargs):
+        try:
+            instance = self.get_object()
+            serializer = self.get_serializer(instance)
+            return Response({
+                "success": True,
+                "statusCode": status.HTTP_200_OK,
+                "data": serializer.data,
+                "message": "Get Outgoing Package"
+            }, status=status.HTTP_200_OK)
+        except Package.DoesNotExist:
+            return Response({
+                "success": False,
+                "statusCode": status.HTTP_404_NOT_FOUND,
+                "data": None,
+                "message": "Outgoing package not found"
+            }, status=status.HTTP_404_NOT_FOUND)
+
+
+class DeliveredPackageDetailAPIView(generics.RetrieveAPIView):
+    '''
+    Get: Retrieve a single delivered package with formatted response
+    '''
+    queryset = Package.objects.filter(package_type=Package.PackageType.DELIVERED)
+    serializer_class = DeliveredPackageSerializer
+    permission_classes = [permissions.AllowAny]
+    lookup_field = "id"
+
+    @swagger_auto_schema(
+        **swagger.retrieve_operation(
+            summary="Get delivered package details",
+            description="Retrieve detailed information about a specific delivered package with formatted response.",
+            serializer=DeliveredPackageSerializer
+        )
+    )
+    def get(self, request, *args, **kwargs):
+        try:
+            instance = self.get_object()
+            serializer = self.get_serializer(instance)
+            return Response({
+                "success": True,
+                "statusCode": status.HTTP_200_OK,
+                "data": serializer.data,
+                "message": "Get Delivered Package"
+            }, status=status.HTTP_200_OK)
+        except Package.DoesNotExist:
+            return Response({
+                "success": False,
+                "statusCode": status.HTTP_404_NOT_FOUND,
+                "data": None,
+                "message": "Delivered package not found"
+            }, status=status.HTTP_404_NOT_FOUND)
 
 
 class PackageUpdateAPIView(generics.UpdateAPIView):

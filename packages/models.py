@@ -111,6 +111,30 @@ class Package(models.Model):
         help_text="City name (required for Incoming packages)"
     )
 
+    item_value = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Value of the item in the package"
+    )
+
+    # Outgoing package fields
+    recipient_name = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text="Recipient name for outgoing packages"
+    )
+    recipient_phone = models.CharField(
+        max_length=20,
+        blank=True,
+        help_text="Recipient phone number"
+    )
+    recipient_email = models.EmailField(
+        blank=True,
+        help_text="Recipient email address"
+    )
+
     shipment_status = models.CharField(
         max_length=30,
         choices=ShipmentStatus.choices,
