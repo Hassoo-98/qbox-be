@@ -70,7 +70,7 @@ class PackageTimeListItemView(APIView):
             "statusCode":status.HTTP_400_BAD_REQUEST,
             "data":serializer.errors,
             "message":"validation error"
-        })
+        },status=status.HTTP_400_BAD_REQUEST)
 
 class PackageTimelineDetailView(APIView):
     """
