@@ -15,7 +15,6 @@ class PackageTimelineSerializer(serializers.ModelSerializer):
             "date_and_time",
             "status",
             "description",
-            "city",
             "package",
             "package_status",
             "package_city",
@@ -25,12 +24,10 @@ class PackageTimelineSerializer(serializers.ModelSerializer):
     
     def validate(self, data):
         """
-        Auto-populate status and city from package if not provided
+        Auto-populate status from package if not provided
         """
         package = data.get('package')
         if package:
             if not data.get('status'):
                 data['status'] = package.shipment_status
-            if not data.get('city'):
-                data['city'] = package.city
         return data
