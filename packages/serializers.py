@@ -140,6 +140,17 @@ class OutgoingPackageSerializer(serializers.Serializer):
 
     def get_paymentSummary(self, obj):
         """Build payment summary for outgoing packages"""
+        # Use payment fields from model if available, otherwise return default
+        if hasattr(obj, 'payment_method') and obj.payment_method:
+            return {
+                "paymentMethod": obj.payment_method,
+                "charges": obj.payment_charges if hasattr(obj, 'payment_charges') and obj.payment_charges else [
+                    {"key": "Base delivery fee (First 5 Kg's)", "value": 5},
+                    {"key": "Additional per Kg", "value": 10},
+                    {"key": "Tax Fuel", "value": 5},
+                ],
+                "currency": obj.payment_currency if hasattr(obj, 'payment_currency') and obj.payment_currency else "SAR"
+            }
         return {
             "paymentMethod": "Apple Pay",
             "charges": [
@@ -210,7 +221,9 @@ class PackageCreateSerializer(serializers.ModelSerializer):
             "service_provider", "driver_name", "qr_code",
             "package_type", "outgoing_status", "city", 
             "item_value", "recipient_name", "recipient_phone", 
-            "recipient_email", "description", "details"
+            "recipient_email", "description",
+            "payment_method", "payment_currency", "payment_charges",
+            "details"
         ]
         extra_kwargs = {
             "tracking_id": {"required": False, "allow_blank": True}

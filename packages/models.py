@@ -140,6 +140,25 @@ class Package(models.Model):
         help_text="Package description"
     )
 
+    # Payment fields for outgoing packages
+    payment_method = models.CharField(
+        max_length=50,
+        blank=True,
+        default="Apple Pay",
+        help_text="Payment method for outgoing packages"
+    )
+    payment_currency = models.CharField(
+        max_length=10,
+        blank=True,
+        default="SAR",
+        help_text="Payment currency"
+    )
+    payment_charges = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Payment charges as JSON array"
+    )
+
     shipment_status = models.CharField(
         max_length=30,
         choices=ShipmentStatus.choices,
