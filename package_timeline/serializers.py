@@ -11,7 +11,7 @@ class PackageTimelineSerializer(serializers.ModelSerializer):
             "city",
             "package"
         )
-        read_only_fields=("date_and_time")
+        read_only_fields=["date_and_time"]
     def validate_status(self,value):
         """
         Field-level valdiation for status field
