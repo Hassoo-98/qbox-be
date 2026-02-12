@@ -36,7 +36,7 @@ class PackageTimelineSerializer(serializers.ModelSerializer):
         """
         Object-level validation
         """
-        if not data.get("status"," ") and not data.get("city"):
+        if not data.get("status") or not data.get("city"):
             raise serializers.ValidationError(
-            _("status and city must be required")
+                _("status and city are required")
             )
