@@ -9,6 +9,7 @@ from rest_framework import permissions as permission
 from rest_framework.pagination import PageNumberPagination
 from drf_yasg.utils import swagger_auto_schema
 from utils.swagger_schema import SwaggerHelper,get_serializer_schema
+import uuid
 swagger=SwaggerHelper("Package Timeline")
 class StandardResultsSetPagination(PageNumberPagination):
     page_size=10
@@ -78,8 +79,8 @@ class PackageTimelineDetailView(APIView):
     DELETE: Delete timeline
     """
     permission_classes=[permission.AllowAny]
-    def get_object(self,request,pk):
-        return get_object_or_404(PackageTimeline,pk=pk)
+    def get_object(self,pk):
+        return get_object_or_404(PackageTimeline, id=pk)
     @swagger_auto_schema(
         **swagger.retrieve_operation(
             summary="Retrieve Package Timeline",
@@ -122,7 +123,15 @@ class PackageTimelineByPackageIdView(APIView):
         )
     )
     def get(self,request,package_id):
-        timelines=PackageTimeline.objects.filter(package_id=package_id)
+        try:
+            package_uuid = uuid.UUID(package_id)
+            timelines=PackageTimeline.objects.filter(package_id=package_uuid)
+        except (ValueError, TypeError):
+            return Response({
+                "success":False,
+                "statusCode":status.HTTP_400_BAD_REQUEST,
+                "message":"Invalid package ID format"
+            },status=status.HTTP_400_BAD_REQUEST)
         
         if not timelines.exists():
             return Response({
