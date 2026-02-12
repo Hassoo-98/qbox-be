@@ -1,9 +1,14 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from packages.models import Package
+import uuid
 
 class PackageTimeline(models.Model):
-    id=models.BigAutoField(primary_key=True)
+    id=models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False
+    )
     date_and_time=models.DateTimeField(
         auto_now_add=True,
         verbose_name=_("Date and Time"))
@@ -20,4 +25,6 @@ class PackageTimeline(models.Model):
      ordering=["-date_and_time"]
      verbose_name=_("Package Timeline")
      verbose_name_plural=_("Package Timelines")
-  
+    
+    def __str__(self):
+        return f"{self.status} - {self.package}"
