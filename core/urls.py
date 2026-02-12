@@ -25,6 +25,7 @@ schema_view = get_schema_view(
 urlpatterns = [
    
     path("admin/", admin.site.urls),
+
     path("auth/", include("accounts.urls")),
     path("staff/", include("staff.urls")),
     path("driver/", include("driver.urls")),
@@ -33,6 +34,7 @@ urlpatterns = [
     path("packages/", include("packages.urls")),
     path("service_provider/", include("service_provider.urls")),
     path("locations/", include("locations.urls")),
+    path("timelines/",include("package_timeline.urls")),
       re_path(
         r"^swagger/$",
         schema_view.with_ui("swagger", cache_timeout=0),
