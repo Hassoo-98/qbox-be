@@ -9,16 +9,76 @@ class PackageDetailsSerializer(serializers.ModelSerializer):
 
 class PackageSerializer(serializers.ModelSerializer):
     details = PackageDetailsSerializer(read_only=True)
+    type = serializers.SerializerMethodField()
+    trackingId = serializers.CharField(source="tracking_id")
+    courierName = serializers.CharField(source="service_provider")
+    lastUpdate = serializers.DateTimeField(source="last_update")
+    qrCode = serializers.CharField(source="qr_code")
+    status = serializers.CharField(source="outgoing_status")
+    phoneNumber = serializers.CharField(source="recipient_phone")
+    email = serializers.EmailField(source="recipient_email")
+    recepientName = serializers.CharField(source="recipient_name")
+    imageUrl = serializers.SerializerMethodField()
+    attributes = serializers.SerializerMethodField()
+    paymentSummary = serializers.SerializerMethodField()
     
     class Meta:
         model = Package
         fields = [
-            "id", "qbox", "tracking_id", "merchant_name",
-            "service_provider", "driver_name", "qr_code",
-            "package_type", "outgoing_status", "city",
-            "shipment_status", "last_update", "created_at", "details"
+            "id", "qbox", "tracking_id", "trackingId", "merchant_name",
+            "service_provider", "courierName", "driver_name", "qr_code", "qrCode",
+            "package_type", "type", "outgoing_status", "status", "city",
+            "shipment_status", "last_update", "lastUpdate", "created_at", 
+            "details", "item_value", "recipient_name", "recepientName",
+            "recipient_phone", "phoneNumber", "recipient_email", "email",
+            "description", "payment_method", "payment_currency", "payment_charges",
+            "imageUrl", "attributes", "paymentSummary"
         ]
         read_only_fields = ["id", "created_at", "last_update"]
+    
+    def get_type(self, obj):
+        return f"PACKAGE_TYPE.{obj.package_type.upper()}"
+    
+    def get_imageUrl(self, obj):
+        return "https://example.com/images/packageItem.jpg"
+    
+    def get_attributes(self, obj):
+        attributes = []
+        if hasattr(obj, 'details') and obj.details:
+            if obj.details.package_type:
+                attributes.append({"type": "Package Type", "value": obj.details.package_type})
+            if obj.details.package_weight:
+                attributes.append({"type": "Package Weight", "value": obj.details.package_weight})
+        if hasattr(obj, 'item_value') and obj.item_value:
+            attributes.append({"type": "Item Value", "value": str(obj.item_value)})
+        if not attributes:
+            attributes = [
+                {"type": "Package Type", "value": "General"},
+                {"type": "Item Value", "value": "0"},
+                {"type": "Package Weight", "value": "1 kg"},
+            ]
+        return attributes
+    
+    def get_paymentSummary(self, obj):
+        if hasattr(obj, 'payment_method') and obj.payment_method:
+            return {
+                "paymentMethod": obj.payment_method,
+                "charges": obj.payment_charges if hasattr(obj, 'payment_charges') and obj.payment_charges else [
+                    {"key": "Base delivery fee (First 5 Kg's)", "value": 5},
+                    {"key": "Additional per Kg", "value": 10},
+                    {"key": "Tax Fuel", "value": 5},
+                ],
+                "currency": obj.payment_currency if hasattr(obj, 'payment_currency') and obj.payment_currency else "SAR"
+            }
+        return {
+            "paymentMethod": "Apple Pay",
+            "charges": [
+                {"key": "Base delivery fee (First 5 Kg's)", "value": 5},
+                {"key": "Additional per Kg", "value": 10},
+                {"key": "Tax Fuel", "value": 5},
+            ],
+            "currency": "SAR"
+        }
 
 class PackageListSerializer(serializers.ModelSerializer):
     class Meta:
