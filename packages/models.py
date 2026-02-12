@@ -135,6 +135,11 @@ class Package(models.Model):
         help_text="Recipient email address"
     )
 
+    description = models.TextField(
+        blank=True,
+        help_text="Package description"
+    )
+
     shipment_status = models.CharField(
         max_length=30,
         choices=ShipmentStatus.choices,
