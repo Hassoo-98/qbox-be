@@ -12,9 +12,10 @@ class PackageTimeline(models.Model):
     date_and_time=models.DateTimeField(
         auto_now_add=True,
         verbose_name=_("Date and Time"))
-    status=models.CharField(max_length=100,verbose_name=_("Status"))
-    description=models.TextField(verbose_name=_("Description"))
-    city=models.CharField(max_length=100,verbose_name=_("City"))
+    status=models.CharField(max_length=100,verbose_name=_("Status"), blank=True)
+    description=models.TextField(verbose_name=_("Description"), blank=True)
+    city=models.CharField(max_length=100,verbose_name=_("City"), blank=True)
+    issue_related_to=models.CharField(max_length=100,verbose_name=_("Issue Related To"), blank=True)
     package=models.ForeignKey(
         Package,
         on_delete=models.CASCADE,
