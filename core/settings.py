@@ -73,7 +73,9 @@ INSTALLED_APPS = [
     "packages",
     "service_provider",
     "locations",
-    'drf_yasg'
+    'drf_yasg',
+    'package_timeline'
+
 ]
 AUTH_USER_MODEL = 'accounts.CustomUser'
 SESSION_COOKIE_SAMESITE = None
