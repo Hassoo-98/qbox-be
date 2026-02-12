@@ -3,6 +3,7 @@ from django.utils.translation import gettext_lazy as _
 from packages.models import Package
 
 class PackageTimeline(models.Model):
+    id=models.BigAutoField(primary_key=True)
     date_and_time=models.DateTimeField(
         auto_now_add=True,
         verbose_name=_("Date and Time"))
@@ -11,7 +12,7 @@ class PackageTimeline(models.Model):
     city=models.CharField(max_length=100,verbose_name=_("City"))
     package=models.ForeignKey(
         Package,
-        on_delete=models.CASADE,
+        on_delete=models.CASCADE,
         related_name="timeline",
         verbose_name=("Package")
     )
