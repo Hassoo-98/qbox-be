@@ -5,6 +5,7 @@ class PackageTimelineSerializer(serializers.ModelSerializer):
     class Meta:
         model=PackageTimeline
         fields=(
+            "id",
             "date_and_time",
             "status",
             "description",
@@ -20,6 +21,7 @@ class PackageTimelineSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 _("status must be 3 characters or more")
             )
+        return value
     def validate_city(self,value):
         """
         Field-level valdiation for city field
@@ -28,15 +30,4 @@ class PackageTimelineSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 _("City must be 3 characters or more")
             )
-        if not value.isalpha():
-            raise serializers.ValidationError(
-            _("City must be characters from a to z")
-            )
-    def validate(self,data):
-        """
-        Object-level validation
-        """
-        if not data.get("status") or not data.get("city"):
-            raise serializers.ValidationError(
-                _("status and city are required")
-            )
+        return value
