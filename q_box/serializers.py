@@ -4,9 +4,12 @@ import qrcode
 from io import BytesIO
 from django.core.files import File
 from django.conf import settings
+import requests
+
 
 class QboxSerializer(serializers.ModelSerializer):
     packages = serializers.SerializerMethodField()
+    qbox_image_url = serializers.SerializerMethodField()
     
     class Meta:
         model = Qbox
@@ -14,7 +17,7 @@ class QboxSerializer(serializers.ModelSerializer):
             "id", "qbox_id", "homeowner", "homeowner_name_snapshot",
             "short_address_snapshot", "city_snapshot", "status",
             "led_indicator", "camera_status", "last_online",
-            "activation_date", "qbox_image", "created_at", "updated_at",
+            "activation_date", "qbox_image", "qbox_image_url", "created_at", "updated_at",
             "packages"
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
@@ -22,19 +25,103 @@ class QboxSerializer(serializers.ModelSerializer):
     def get_packages(self, obj):
         from packages.serializers import PackageSerializer
         return PackageSerializer(obj.packages.all(), many=True).data
+    
+    def get_qbox_image_url(self, obj):
+        """Return full working URL for the qbox image"""
+        if obj.qbox_image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.qbox_image) if obj.qbox_image.startswith('/') else obj.qbox_image
+            return f"{settings.MEDIA_URL}{obj.qbox_image}" if not obj.qbox_image.startswith('http') else obj.qbox_image
+        return None
+    
+    def validate_qbox_image(self, value):
+        """Handle image URL or base64 from JSON input"""
+        if not value:
+            return value
+        
+        # If it's a URL string, download and save the file
+        if isinstance(value, str):
+            if value.startswith('http://') or value.startswith('https://'):
+                try:
+                    response = requests.get(value)
+                    if response.status_code == 200:
+                        from django.core.files.base import ContentFile
+                        import os
+                        filename = value.split('/')[-1].split('?')[0]
+                        # Generate unique filename
+                        import uuid
+                        ext = filename.split('.')[-1] if '.' in filename else 'jpg'
+                        filename = f"{uuid.uuid4().hex}.{ext}"
+                        return ContentFile(response.content, name=filename)
+                except Exception as e:
+                    raise serializers.ValidationError(f"Failed to download image from URL: {str(e)}")
+            elif value.startswith('data:image'):
+                # Handle base64 data URI
+                import base64
+                from django.core.files.base import ContentFile
+                import uuid
+                # Remove data URI prefix
+                base64_data = value.split(',')[1] if ',' in value else value
+                image_data = base64.b64decode(base64_data)
+                ext = 'jpg'
+                if 'png' in value:
+                    ext = 'png'
+                elif 'gif' in value:
+                    ext = 'gif'
+                elif 'webp' in value:
+                    ext = 'webp'
+                filename = f"{uuid.uuid4().hex}.{ext}"
+                return ContentFile(image_data, name=filename)
+        
+        return value
+    
+    def create(self, validated_data):
+        """Handle qbox_image URL/string upload"""
+        qbox_image = validated_data.pop('qbox_image', None)
+        qbox = Qbox.objects.create(**validated_data)
+        
+        if qbox_image:
+            qbox.qbox_image = qbox_image
+            qbox.save(update_fields=['qbox_image'])
+        
+        return qbox
+    
+    def update(self, instance, validated_data):
+        """Handle qbox_image URL/string update"""
+        qbox_image = validated_data.pop('qbox_image', None)
+        
+        if qbox_image:
+            instance.qbox_image = qbox_image
+        
+        return super().update(instance, validated_data)
+
 
 class QboxListSerializer(serializers.ModelSerializer):
+    qbox_image_url = serializers.SerializerMethodField()
+    
     class Meta:
         model = Qbox
         fields = [
             "id", "qbox_id", "homeowner_name_snapshot",
             "short_address_snapshot", "city_snapshot", "status",
             "led_indicator", "camera_status", "last_online",
-            "activation_date", "qbox_image"
+            "activation_date", "qbox_image", "qbox_image_url"
         ]
+    
+    def get_qbox_image_url(self, obj):
+        """Return full working URL for the qbox image"""
+        if obj.qbox_image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.qbox_image) if obj.qbox_image.startswith('/') else obj.qbox_image
+            return f"{settings.MEDIA_URL}{obj.qbox_image}" if not obj.qbox_image.startswith('http') else obj.qbox_image
+        return None
+
 
 class QboxCreateSerializer(serializers.ModelSerializer):
     homeowner = serializers.CharField(required=False, allow_null=True, help_text="Homeowner UUID (optional - will be assigned when homeowner creates account with qbox_id)")
+    qbox_image = serializers.CharField(required=False, allow_blank=True, help_text="QBox image URL (http://..., https://..., or base64 data URI)")
 
     class Meta:
         model = Qbox
@@ -42,7 +129,47 @@ class QboxCreateSerializer(serializers.ModelSerializer):
             "qbox_id", "homeowner", "status",
             "led_indicator", "camera_status", "qbox_image"
         ]
-
+    
+    def validate_qbox_image(self, value):
+        """Handle image URL or base64 from JSON input"""
+        if not value:
+            return value
+        
+        # If it's a URL string, download and save the file
+        if isinstance(value, str):
+            if value.startswith('http://') or value.startswith('https://'):
+                try:
+                    response = requests.get(value)
+                    if response.status_code == 200:
+                        from django.core.files.base import ContentFile
+                        import uuid
+                        import os
+                        filename = value.split('/')[-1].split('?')[0]
+                        ext = filename.split('.')[-1] if '.' in filename and len(filename.split('.')[-1]) <= 5 else 'jpg'
+                        filename = f"{uuid.uuid4().hex}.{ext}"
+                        return ContentFile(response.content, name=filename)
+                except Exception as e:
+                    raise serializers.ValidationError(f"Failed to download image from URL: {str(e)}")
+            elif value.startswith('data:image'):
+                # Handle base64 data URI
+                import base64
+                from django.core.files.base import ContentFile
+                import uuid
+                # Remove data URI prefix
+                base64_data = value.split(',')[1] if ',' in value else value
+                image_data = base64.b64decode(base64_data)
+                ext = 'jpg'
+                if 'png' in value:
+                    ext = 'png'
+                elif 'gif' in value:
+                    ext = 'gif'
+                elif 'webp' in value:
+                    ext = 'webp'
+                filename = f"{uuid.uuid4().hex}.{ext}"
+                return ContentFile(image_data, name=filename)
+        
+        return value
+    
     def create(self, validated_data):
         homeowner_uuid = validated_data.pop('homeowner', None)
         from home_owner.models import CustomHomeOwner
@@ -54,21 +181,74 @@ class QboxCreateSerializer(serializers.ModelSerializer):
             except CustomHomeOwner.DoesNotExist:
                 pass
         
+        qbox_image = validated_data.pop('qbox_image', None)
         qbox = Qbox.objects.create(homeowner=homeowner_obj, **validated_data)
+        
+        if qbox_image:
+            qbox.qbox_image = qbox_image
+            qbox.save(update_fields=['qbox_image'])
+        
         if qbox.homeowner:
             qbox.sync_with_homeowner(save=True)
         return qbox
 
+
 class QboxUpdateSerializer(serializers.ModelSerializer):
+    qbox_image = serializers.CharField(required=False, allow_blank=True, help_text="QBox image URL (http://..., https://..., or base64 data URI)")
+    
     class Meta:
         model = Qbox
         fields = [
             "homeowner", "status",
             "led_indicator", "camera_status", "qbox_image"
         ]
-
+    
+    def validate_qbox_image(self, value):
+        """Handle image URL or base64 from JSON input"""
+        if not value:
+            return value
+        
+        # If it's a URL string, download and save the file
+        if isinstance(value, str):
+            if value.startswith('http://') or value.startswith('https://'):
+                try:
+                    response = requests.get(value)
+                    if response.status_code == 200:
+                        from django.core.files.base import ContentFile
+                        import uuid
+                        import os
+                        filename = value.split('/')[-1].split('?')[0]
+                        ext = filename.split('.')[-1] if '.' in filename and len(filename.split('.')[-1]) <= 5 else 'jpg'
+                        filename = f"{uuid.uuid4().hex}.{ext}"
+                        return ContentFile(response.content, name=filename)
+                except Exception as e:
+                    raise serializers.ValidationError(f"Failed to download image from URL: {str(e)}")
+            elif value.startswith('data:image'):
+                # Handle base64 data URI
+                import base64
+                from django.core.files.base import ContentFile
+                import uuid
+                base64_data = value.split(',')[1] if ',' in value else value
+                image_data = base64.b64decode(base64_data)
+                ext = 'jpg'
+                if 'png' in value:
+                    ext = 'png'
+                elif 'gif' in value:
+                    ext = 'gif'
+                elif 'webp' in value:
+                    ext = 'webp'
+                filename = f"{uuid.uuid4().hex}.{ext}"
+                return ContentFile(image_data, name=filename)
+        
+        return value
+    
     def update(self, instance, validated_data):
         old_homeowner = instance.homeowner
+        qbox_image = validated_data.pop('qbox_image', None)
+        
+        if qbox_image:
+            instance.qbox_image = qbox_image
+        
         instance = super().update(instance, validated_data)
         # Sync with homeowner if assigned or changed
         if instance.homeowner:
@@ -80,6 +260,7 @@ class QboxUpdateSerializer(serializers.ModelSerializer):
             instance.city_snapshot = ""
             instance.save(update_fields=['homeowner_name_snapshot', 'short_address_snapshot', 'city_snapshot'])
         return instance
+
 
 class QboxStatusUpdateSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=Qbox.Status.choices, required=True)
@@ -107,8 +288,6 @@ class QboxAccessQRCodeCreateSerializer(serializers.Serializer):
     """
     qbox_id = serializers.CharField(required=True, help_text="Qbox ID to generate QR code for")
     name = serializers.CharField(required=True, max_length=100, help_text="Name for this QR code (e.g., 'Morning shift entrance')")
-   # location = serializers.CharField(required=False, max_length=200, default="", help_text="Location description (e.g., 'Box Main Entrance')")
-   # address = serializers.CharField(required=False, max_length=500, default="", help_text="Full address")
     max_users = serializers.IntegerField(default=5, min_value=1, help_text="Maximum number of users who can use this QR code")
     duration_type = serializers.ChoiceField(
         choices=QboxAccessQRCode.DurationType.choices,
