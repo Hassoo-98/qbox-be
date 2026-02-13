@@ -17,6 +17,7 @@ class PackageTimelineSerializer(serializers.ModelSerializer):
             "description",
             "package",
             "package_status",
+            
             "package_city",
             "issue_related_to"
         )
