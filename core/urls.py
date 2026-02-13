@@ -34,6 +34,7 @@ urlpatterns = [
     path("packages/", include("packages.urls")),
     path("service_provider/", include("service_provider.urls")),
     path("locations/", include("locations.urls")),
+    path("promotion/", include("promotion.urls")),
     path("timelines/",include("package_timeline.urls")),
       re_path(
         r"^swagger/$",
