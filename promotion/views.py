@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import permissions
+from django.db import models
 from django.shortcuts import get_object_or_404
 from .models import Promotion
 from .serializers import (
@@ -19,23 +20,48 @@ import uuid
 
 swagger = SwaggerHelper("Promotions")
 
+
 class StandardResultsPagination(PageNumberPagination):
     page_size = 10
     page_size_query_param = "page_size"
     max_page_size = 100
-    
+
+
 class PromotionsListView(APIView):
     pagination_class = StandardResultsPagination
     permission_classes = [permissions.AllowAny]
-    
+
     @swagger_auto_schema(
-        **swagger.create_operation(
+        **swagger.list_operation(
             summary="List Promotions",
             serializer=PromotionListSerializer
         )
     )
     def get(self, request):
         promotions = Promotion.objects.all().order_by("-created_at")
+        
+        # Filtering params
+        search = request.query_params.get('search', None)
+        promo_type = request.query_params.get('promo_type', None)
+        is_active = request.query_params.get('is_active', None)
+        merchant_provider = request.query_params.get('merchant_provider', None)
+        
+        if search:
+            promotions = promotions.filter(
+                models.Q(title__icontains=search) |
+                models.Q(description__icontains=search) |
+                models.Q(code__icontains=search)
+            )
+        
+        if promo_type:
+            promotions = promotions.filter(promo_type=promo_type)
+        
+        if is_active is not None:
+            promotions = promotions.filter(is_active=is_active.lower() == 'true')
+        
+        if merchant_provider:
+            promotions = promotions.filter(merchant_provider_name__icontains=merchant_provider)
+        
         paginator = self.pagination_class()
         paginated_qs = paginator.paginate_queryset(promotions, request)
         serializer = PromotionListSerializer(paginated_qs, many=True)
@@ -49,7 +75,7 @@ class PromotionsListView(APIView):
                 "hasMore": paginator.page.has_next()
             }
         }, status=status.HTTP_200_OK)
-    
+
     @swagger_auto_schema(
         **swagger.create_operation(
             summary="Create Promotion",
@@ -59,11 +85,13 @@ class PromotionsListView(APIView):
     def post(self, request):
         serializer = PromotionSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
+            # Generate unique code in view to avoid multiple calls
+            from .models import generate_unique_code
+            promotion = serializer.save(code=generate_unique_code())
             return Response({
                 "success": True,
                 "statusCode": status.HTTP_201_CREATED,
-                "data": serializer.data
+                "data": PromotionSerializer(promotion).data
             }, status=status.HTTP_201_CREATED)
         return Response({
             "success": False,
@@ -71,14 +99,15 @@ class PromotionsListView(APIView):
             "errors": serializer.errors
         }, status=status.HTTP_400_BAD_REQUEST)
 
+
 class PromotionDetailView(APIView):
     permission_classes = [permissions.AllowAny]
-    
+
     def get_object(self, pk):
         return get_object_or_404(Promotion, pk=pk)
-    
+
     @swagger_auto_schema(
-        **swagger.create_operation(
+        **swagger.retrieve_operation(
             summary="Get Promotion Detail",
             serializer=PromotionDetailSerializer
         )
@@ -91,9 +120,9 @@ class PromotionDetailView(APIView):
             "statusCode": status.HTTP_200_OK,
             "data": serializer.data
         }, status=status.HTTP_200_OK)
-    
+
     @swagger_auto_schema(
-        **swagger.create_operation(
+        **swagger.update_operation(
             summary="Update Promotion",
             serializer=PromotionSerializer
         )
@@ -113,9 +142,9 @@ class PromotionDetailView(APIView):
             "statusCode": status.HTTP_400_BAD_REQUEST,
             "errors": serializer.errors
         }, status=status.HTTP_400_BAD_REQUEST)
-    
+
     @swagger_auto_schema(
-        **swagger.create_operation(
+        **swagger.delete_operation(
             summary="Delete Promotion",
             serializer=PromotionDeleteSerializer
         )
@@ -129,14 +158,15 @@ class PromotionDetailView(APIView):
             "message": "Promotion deleted successfully"
         }, status=status.HTTP_200_OK)
 
+
 class PromotionStatusView(APIView):
     permission_classes = [permissions.AllowAny]
-    
+
     def get_object(self, pk):
         return get_object_or_404(Promotion, pk=pk)
-    
+
     @swagger_auto_schema(
-        **swagger.create_operation(
+        **swagger.update_operation(
             summary="Update Promotion Status",
             serializer=PromotionStatusSerializer
         )
