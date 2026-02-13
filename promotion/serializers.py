@@ -6,6 +6,7 @@ from django.utils import timezone
 
 class PromotionSerializer(serializers.ModelSerializer):
     user_limit = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=0.01)
+    merchant_provider_img = serializers.ImageField(required=False, allow_null=True)
     
     class Meta:
         model = Promotion
@@ -17,6 +18,7 @@ class PromotionSerializer(serializers.ModelSerializer):
             "promo_type",
             "user_limit",
             "merchant_provider_name",
+            "merchant_provider_img",
             "is_active",
             "start_date",
             "end_date",
@@ -58,6 +60,7 @@ class PromotionSerializer(serializers.ModelSerializer):
 
 class PromotionListSerializer(serializers.ModelSerializer):
     merchant_name = serializers.CharField(source="merchant_provider_name", read_only=True)
+    merchant_img_url = serializers.SerializerMethodField()
     
     class Meta:
         model = Promotion
@@ -69,20 +72,34 @@ class PromotionListSerializer(serializers.ModelSerializer):
             "promo_type",
             "user_limit",
             "merchant_name",
+            "merchant_img_url",
             "is_active",
             "start_date",
             "end_date",
             "created_at"
         ]
+    
+    def get_merchant_img_url(self, obj):
+        if obj.merchant_provider_img:
+            request = self.context.get('request')
+            return request.build_absolute_uri(obj.merchant_provider_img.url)
+        return None
 
 
 class PromotionDetailSerializer(serializers.ModelSerializer):
     user_limit = serializers.DecimalField(max_digits=10, decimal_places=2)
+    merchant_img_url = serializers.SerializerMethodField()
     
     class Meta:
         model = Promotion
         fields = "__all__"
         read_only_fields = ["created_at", "code"]
+    
+    def get_merchant_img_url(self, obj):
+        if obj.merchant_provider_img:
+            request = self.context.get('request')
+            return request.build_absolute_uri(obj.merchant_provider_img.url)
+        return None
 
 
 class PromotionStatusSerializer(serializers.ModelSerializer):
