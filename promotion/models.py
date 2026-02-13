@@ -34,6 +34,7 @@ class Promotion(models.Model):
     )
     user_limit = models.DecimalField(max_digits=10, decimal_places=2)
     merchant_provider_name = models.CharField(max_length=100)
+    merchant_provider_img = models.ImageField(upload_to="merchant_promotion_images/", null=True, blank=True)
     is_active = models.BooleanField(default=True)
     start_date = models.DateField()
     end_date = models.DateField()
