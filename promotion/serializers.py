@@ -51,7 +51,7 @@ class PromotionSerializer(serializers.ModelSerializer):
         return data
     
 class PromotionListSerializer(serializers.ModelSerializer):
-    merchant_name=serializers.CharField(source="merchant_provider_name.name",read_only=True)
+    merchant_name = serializers.CharField(source="merchant_provider_name", read_only=True)
     class Meta:
         model=Promotion
         fields=(
@@ -67,7 +67,7 @@ class PromotionListSerializer(serializers.ModelSerializer):
             "created_at"
         )
 class PromotionDetailSerializer(serializers.ModelSerializer):
-    merchant_provider_name=serializers.StringRelatedField()
+    merchant_provider_name = serializers.CharField()
     class Meta:
         model=Promotion
         fields="__all__"
