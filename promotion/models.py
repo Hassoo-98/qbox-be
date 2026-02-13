@@ -8,7 +8,7 @@ def generate_unique_code():
     while True:
         letters = ''.join(random.choices(string.ascii_uppercase, k=10))
         digits = ''.join(random.choices(string.digits, k=6))
-        code = f"${letters}{digits}"
+        code = f"{letters}{digits}"
         if not Promotion.objects.filter(code=code).exists():
             return code
 
@@ -19,7 +19,7 @@ class Promotion(models.Model):
         default=uuid.uuid4,
         editable=False
     )
-    code = models.CharField(max_length=20, unique=True, default=generate_unique_code)
+    code = models.CharField(max_length=20, unique=True, blank=True)
     title = models.CharField(max_length=255)
     description = models.TextField()
     
@@ -38,6 +38,11 @@ class Promotion(models.Model):
     start_date = models.DateField()
     end_date = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)
+    
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = generate_unique_code()
+        super().save(*args, **kwargs)
     
     def __str__(self):
         return self.title
