@@ -72,7 +72,7 @@ INSTALLED_APPS = [
     "q_box",
     "packages",
     "service_provider",
-    "locations",
+    "locations", 
     'drf_yasg',
     'package_timeline',
     "promotion"
