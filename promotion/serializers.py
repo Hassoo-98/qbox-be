@@ -6,7 +6,7 @@ from django.utils import timezone
 
 class PromotionSerializer(serializers.ModelSerializer):
     user_limit = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=0.01)
-    merchant_provider_img = serializers.ImageField(required=False, allow_null=True)
+    merchant_provider_img = serializers.ImageField(required=False, allow_null=True,use_url=True)
     
     class Meta:
         model = Promotion
