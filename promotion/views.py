@@ -2,6 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
+from rest_framework import permissions
 from django.shortcuts import get_object_or_404
 from .models import Promotion
 from .serializers import (
@@ -25,7 +26,7 @@ class StandardResultsPagination(PageNumberPagination):
     
 class PromotionsListView(APIView):
     pagination_class = StandardResultsPagination
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
     
     @swagger_auto_schema(
         **swagger.create_operation(
@@ -71,7 +72,7 @@ class PromotionsListView(APIView):
         }, status=status.HTTP_400_BAD_REQUEST)
 
 class PromotionDetailView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
     
     def get_object(self, pk):
         return get_object_or_404(Promotion, pk=pk)
@@ -129,7 +130,7 @@ class PromotionDetailView(APIView):
         }, status=status.HTTP_200_OK)
 
 class PromotionStatusView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
     
     def get_object(self, pk):
         return get_object_or_404(Promotion, pk=pk)
