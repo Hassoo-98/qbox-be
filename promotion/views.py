@@ -119,17 +119,8 @@ class PromotionsListView(APIView):
         }, status=status.HTTP_200_OK)
 
     @swagger_auto_schema(
-        operation_description="Create a new promotion with optional image upload.",
+        operation_description="Create a new promotion with optional image URL.",
         request_body=PromotionSerializer,
-        manual_parameters=[
-            openapi.Parameter(
-                'merchant_provider_img',
-                openapi.IN_FORM,
-                description='Merchant/provider image file',
-                type=openapi.TYPE_FILE,
-                format='binary'
-            ),
-        ],
         responses={
             201: PromotionSerializer,
             400: "Bad Request - Validation errors",
@@ -178,17 +169,8 @@ class PromotionDetailView(APIView):
         }, status=status.HTTP_200_OK)
 
     @swagger_auto_schema(
-        operation_description="Update a promotion by ID with optional image upload.",
+        operation_description="Update a promotion by ID with optional image URL.",
         request_body=PromotionSerializer,
-        manual_parameters=[
-            openapi.Parameter(
-                'merchant_provider_img',
-                openapi.IN_FORM,
-                description='Merchant/provider image file',
-                type=openapi.TYPE_FILE,
-                format='binary'
-            ),
-        ],
         responses={
             200: PromotionSerializer,
             400: "Bad Request - Validation errors",
