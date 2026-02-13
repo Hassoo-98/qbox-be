@@ -106,7 +106,7 @@ class PromotionsListView(APIView):
         
         paginator = self.pagination_class()
         paginated_qs = paginator.paginate_queryset(promotions, request)
-        serializer = PromotionListSerializer(paginated_qs, many=True)
+        serializer = PromotionListSerializer(paginated_qs, many=True,context={"request":request})
         return Response({
             "success": True,
             "statusCode": status.HTTP_200_OK,
@@ -136,7 +136,7 @@ class PromotionsListView(APIView):
             return Response({
                 "success": True,
                 "statusCode": status.HTTP_201_CREATED,
-                "data": PromotionSerializer(promotion).data
+                "data": PromotionSerializer(promotion,context={"request":request}).data
             }, status=status.HTTP_201_CREATED)
         return Response({
             "success": False,
@@ -161,7 +161,7 @@ class PromotionDetailView(APIView):
     )
     def get(self, request, pk):
         promotion = self.get_object(pk)
-        serializer = PromotionDetailSerializer(promotion)
+        serializer = PromotionDetailSerializer(promotion,context={"request":request})
         return Response({
             "success": True,
             "statusCode": status.HTTP_200_OK,
