@@ -15,7 +15,8 @@ from .serializers import (
 )
 from rest_framework.pagination import PageNumberPagination
 from drf_yasg.utils import swagger_auto_schema
-from utils.swagger_schema import SwaggerHelper,get_serializer_schema
+from drf_yasg import openapi
+from utils.swagger_schema import SwaggerHelper, get_serializer_schema
 import uuid
 
 swagger = SwaggerHelper("Promotions")
@@ -32,10 +33,51 @@ class PromotionsListView(APIView):
     permission_classes = [permissions.AllowAny]
 
     @swagger_auto_schema(
-        **swagger.list_operation(
-            summary="List Promotions",
-            serializer=PromotionListSerializer
-        )
+        manual_parameters=[
+            openapi.Parameter(
+                'search',
+                openapi.IN_QUERY,
+                description="Search in title, description, or code",
+                type=openapi.TYPE_STRING
+            ),
+            openapi.Parameter(
+                'promo_type',
+                openapi.IN_QUERY,
+                description="Filter by promo type (Flat or Percentage)",
+                type=openapi.TYPE_STRING,
+                enum=['Flat', 'Percentage']
+            ),
+            openapi.Parameter(
+                'is_active',
+                openapi.IN_QUERY,
+                description="Filter by active status (true or false)",
+                type=openapi.TYPE_BOOLEAN
+            ),
+            openapi.Parameter(
+                'merchant_provider',
+                openapi.IN_QUERY,
+                description="Filter by merchant provider name",
+                type=openapi.TYPE_STRING
+            ),
+            openapi.Parameter(
+                'page',
+                openapi.IN_QUERY,
+                description="Page number",
+                type=openapi.TYPE_INTEGER
+            ),
+            openapi.Parameter(
+                'page_size',
+                openapi.IN_QUERY,
+                description="Number of items per page (default 10, max 100)",
+                type=openapi.TYPE_INTEGER
+            ),
+        ],
+        operation_description="Get a list of all promotions with optional filtering and pagination.",
+        responses={
+            200: PromotionListSerializer(many=True),
+            400: "Bad Request",
+            500: "Internal Server Error"
+        }
     )
     def get(self, request):
         promotions = Promotion.objects.all().order_by("-created_at")
@@ -77,10 +119,13 @@ class PromotionsListView(APIView):
         }, status=status.HTTP_200_OK)
 
     @swagger_auto_schema(
-        **swagger.create_operation(
-            summary="Create Promotion",
-            serializer=PromotionSerializer
-        )
+        operation_description="Create a new promotion.",
+        request_body=PromotionSerializer,
+        responses={
+            201: PromotionSerializer,
+            400: "Bad Request - Validation errors",
+            500: "Internal Server Error"
+        }
     )
     def post(self, request):
         serializer = PromotionSerializer(data=request.data)
@@ -107,10 +152,12 @@ class PromotionDetailView(APIView):
         return get_object_or_404(Promotion, pk=pk)
 
     @swagger_auto_schema(
-        **swagger.retrieve_operation(
-            summary="Get Promotion Detail",
-            serializer=PromotionDetailSerializer
-        )
+        operation_description="Get a single promotion by ID.",
+        responses={
+            200: PromotionDetailSerializer,
+            404: "Not Found",
+            500: "Internal Server Error"
+        }
     )
     def get(self, request, pk):
         promotion = self.get_object(pk)
@@ -122,10 +169,14 @@ class PromotionDetailView(APIView):
         }, status=status.HTTP_200_OK)
 
     @swagger_auto_schema(
-        **swagger.update_operation(
-            summary="Update Promotion",
-            serializer=PromotionSerializer
-        )
+        operation_description="Update a promotion by ID.",
+        request_body=PromotionSerializer,
+        responses={
+            200: PromotionSerializer,
+            400: "Bad Request - Validation errors",
+            404: "Not Found",
+            500: "Internal Server Error"
+        }
     )
     def put(self, request, pk):
         promotion = self.get_object(pk)
@@ -144,10 +195,12 @@ class PromotionDetailView(APIView):
         }, status=status.HTTP_400_BAD_REQUEST)
 
     @swagger_auto_schema(
-        **swagger.delete_operation(
-            summary="Delete Promotion",
-            serializer=PromotionDeleteSerializer
-        )
+        operation_description="Delete a promotion by ID.",
+        responses={
+            200: "Promotion deleted successfully",
+            404: "Not Found",
+            500: "Internal Server Error"
+        }
     )
     def delete(self, request, pk):
         promotion = self.get_object(pk)
@@ -166,10 +219,14 @@ class PromotionStatusView(APIView):
         return get_object_or_404(Promotion, pk=pk)
 
     @swagger_auto_schema(
-        **swagger.update_operation(
-            summary="Update Promotion Status",
-            serializer=PromotionStatusSerializer
-        )
+        operation_description="Update the active status of a promotion.",
+        request_body=PromotionStatusSerializer,
+        responses={
+            200: PromotionStatusSerializer,
+            400: "Bad Request - Validation errors",
+            404: "Not Found",
+            500: "Internal Server Error"
+        }
     )
     def patch(self, request, pk):
         promotion = self.get_object(pk)
