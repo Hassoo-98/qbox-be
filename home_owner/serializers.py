@@ -1,6 +1,8 @@
 
 from rest_framework import serializers
 from .models import CustomHomeOwner, CustomHomeOwnerAddress
+import requests
+
 
 class HomeOwnerAddressSerializer(serializers.ModelSerializer):
     class Meta:
@@ -15,7 +17,7 @@ class InstallationSerializer(serializers.Serializer):
     """Serializer for installation details during home owner creation"""
     location_preference = serializers.CharField(required=True, max_length=255, help_text="Preferred location for QBox installation")
     access_instruction = serializers.CharField(required=True, max_length=500, help_text="Instructions for accessing the installation location")
-    qbox_image_url = serializers.FileField(required=False, allow_null=True, help_text="QBox image file")
+    qbox_image_url = serializers.CharField(required=False, allow_blank=True, help_text='QBox image URL - http://..., https://..., or base64 data URI')
 
 
 class HomeOwnerSerializer(serializers.ModelSerializer):
@@ -38,10 +40,13 @@ class HomeOwnerSerializer(serializers.ModelSerializer):
         return QboxListSerializer(obj.qboxes.all(), many=True).data
     
     def get_installation_qbox_image_url(self, obj):
-        """Return full URL for the image"""
+        """Return full working URL for the installation image"""
         from django.conf import settings
         if obj.installation_qbox_image_url:
-            return obj.installation_qbox_image_url.url
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.installation_qbox_image_url.url)
+            return f"{settings.MEDIA_URL}{obj.installation_qbox_image_url}"
         return None
 
 
@@ -57,7 +62,51 @@ class HomeOwnerCreateSerializer(serializers.ModelSerializer):
             "full_name", "email", "phone_number", "secondary_phone_number",
             "password", "address", "installation", "qbox_id"
         ]
-
+    
+    def validate_installation(self, value):
+        """Validate and process installation image URL"""
+        qbox_image_url = value.get('qbox_image_url')
+        if qbox_image_url:
+            value['qbox_image_url'] = self._process_image_url(qbox_image_url)
+        return value
+    
+    def _process_image_url(self, url_value):
+        """Process image URL or base64 and return saved file"""
+        if not url_value:
+            return None
+        
+        if isinstance(url_value, str):
+            if url_value.startswith('http://') or url_value.startswith('https://'):
+                try:
+                    response = requests.get(url_value)
+                    if response.status_code == 200:
+                        from django.core.files.base import ContentFile
+                        import uuid
+                        import os
+                        filename = url_value.split('/')[-1].split('?')[0]
+                        ext = filename.split('.')[-1] if '.' in filename and len(filename.split('.')[-1]) <= 5 else 'jpg'
+                        filename = f"{uuid.uuid4().hex}.{ext}"
+                        return ContentFile(response.content, name=filename)
+                except Exception as e:
+                    raise serializers.ValidationError(f"Failed to download image from URL: {str(e)}")
+            elif url_value.startswith('data:image'):
+                import base64
+                from django.core.files.base import ContentFile
+                import uuid
+                base64_data = url_value.split(',')[1] if ',' in url_value else url_value
+                image_data = base64.b64decode(base64_data)
+                ext = 'jpg'
+                if 'png' in url_value:
+                    ext = 'png'
+                elif 'gif' in url_value:
+                    ext = 'gif'
+                elif 'webp' in url_value:
+                    ext = 'webp'
+                filename = f"{uuid.uuid4().hex}.{ext}"
+                return ContentFile(image_data, name=filename)
+        
+        return url_value
+    
     def create(self, validated_data):
         from q_box.models import Qbox
         
@@ -104,7 +153,8 @@ class HomeOwnerCreateSerializer(serializers.ModelSerializer):
                 qbox = Qbox.objects.get(qbox_id=qbox_id)
                 if not qbox.homeowner:
                     qbox.homeowner = user
-                    qbox.qbox_image = user.installation_qbox_image_url.url if user.installation_qbox_image_url else None
+                    if user.installation_qbox_image_url:
+                        qbox.qbox_image = user.installation_qbox_image_url.url
                     qbox.sync_with_homeowner(save=True)
                     qbox.save()
             except Qbox.DoesNotExist:
@@ -115,13 +165,65 @@ class HomeOwnerCreateSerializer(serializers.ModelSerializer):
 
 class HomeOwnerUpdateSerializer(serializers.ModelSerializer):
     address = HomeOwnerAddressSerializer(required=False)
+    installation_qbox_image_url = serializers.CharField(required=False, allow_blank=True, help_text="QBox image URL (http://..., https://..., or base64 data URI)")
 
     class Meta:
         model = CustomHomeOwner
         fields = [
             "full_name", "phone_number", "secondary_phone_number",
-            "preferred_installment_location", "qbox_image", "address"
+            "preferred_installment_location", "installation_qbox_image_url", "address"
         ]
+    
+    def validate_installation_qbox_image_url(self, value):
+        """Validate and process installation image URL"""
+        if value:
+            return self._process_image_url(value)
+        return value
+    
+    def _process_image_url(self, url_value):
+        """Process image URL or base64 and return saved file"""
+        if not url_value:
+            return None
+        
+        if isinstance(url_value, str):
+            if url_value.startswith('http://') or url_value.startswith('https://'):
+                try:
+                    response = requests.get(url_value)
+                    if response.status_code == 200:
+                        from django.core.files.base import ContentFile
+                        import uuid
+                        import os
+                        filename = url_value.split('/')[-1].split('?')[0]
+                        ext = filename.split('.')[-1] if '.' in filename and len(filename.split('.')[-1]) <= 5 else 'jpg'
+                        filename = f"{uuid.uuid4().hex}.{ext}"
+                        return ContentFile(response.content, name=filename)
+                except Exception as e:
+                    raise serializers.ValidationError(f"Failed to download image from URL: {str(e)}")
+            elif url_value.startswith('data:image'):
+                import base64
+                from django.core.files.base import ContentFile
+                import uuid
+                base64_data = url_value.split(',')[1] if ',' in url_value else url_value
+                image_data = base64.b64decode(base64_data)
+                ext = 'jpg'
+                if 'png' in url_value:
+                    ext = 'png'
+                elif 'gif' in url_value:
+                    ext = 'gif'
+                elif 'webp' in url_value:
+                    ext = 'webp'
+                filename = f"{uuid.uuid4().hex}.{ext}"
+                return ContentFile(image_data, name=filename)
+        
+        return url_value
+    
+    def update(self, instance, validated_data):
+        installation_qbox_image_url = validated_data.pop('installation_qbox_image_url', None)
+        
+        if installation_qbox_image_url:
+            instance.installation_qbox_image_url = installation_qbox_image_url
+        
+        return super().update(instance, validated_data)
 
 
 class HomeOwnerStatusUpdateSerializer(serializers.ModelSerializer):
