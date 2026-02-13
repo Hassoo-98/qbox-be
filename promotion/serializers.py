@@ -7,18 +7,21 @@ class PromotionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Promotion
         fields = (
-            "id",
-            "title",
-            "description",
-            "promo_type",
-            "user_limit",
-            "merchant_provider_name",
-            "is_active",
-            "start_date",
-            "end_date",
-            "created_at"
+            "id", "title", "description", "promo_type",
+            "user_limit", "merchant_provider_name", "is_active",
+            "start_date", "end_date", "created_at"
         )
+
         read_only_fields = ["created_at"]
+        extra_kwargs = {
+            'title': {'required': True},
+            'description': {'required': True},
+            'promo_type': {'required': True},
+            'user_limit': {'required': True},
+            'merchant_provider_name': {'required': True},
+            'start_date': {'required': True},
+            'end_date': {'required': True}
+        }
 
     def validate_title(self, value):
         if Promotion.objects.filter(title=value).exists():
