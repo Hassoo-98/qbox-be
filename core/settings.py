@@ -74,7 +74,8 @@ INSTALLED_APPS = [
     "service_provider",
     "locations",
     'drf_yasg',
-    'package_timeline'
+    'package_timeline',
+    "promotion"
 
 ]
 AUTH_USER_MODEL = 'accounts.CustomUser'
