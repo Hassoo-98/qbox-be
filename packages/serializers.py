@@ -435,7 +435,7 @@ class PackageStatusUpdateSerializer(serializers.Serializer):
 class SendPackageSerializer(serializers.Serializer):
     """Serializer for creating a Send Package with camelCase field names"""
     shippingCompany = serializers.CharField(max_length=100, required=True, help_text="Shipping company name")
-    qboxImage = serializers.CharField(max_length=500, required=True, help_text="URL or file path of the package image")
+    qboxImage = serializers.CharField(max_length=500, required=True, help_text="URL or base64 data URI of the package image (http://..., https://..., or data:image/...;base64,...)")
     packageDescription = serializers.CharField(required=True, help_text="Description of the package")
     packageItemValue = serializers.DecimalField(max_digits=10, decimal_places=2, required=True, help_text="Value of the package item")
     currency = serializers.CharField(max_length=10, required=True, help_text="Currency code (e.g., SAR)")
@@ -445,6 +445,30 @@ class SendPackageSerializer(serializers.Serializer):
     phone = serializers.CharField(max_length=20, required=True, help_text="Contact phone number")
     email = serializers.EmailField(required=True, help_text="Contact email")
     fullName = serializers.CharField(max_length=100, required=True, help_text="Full name of the sender")
+
+    def validate_qboxImage(self, value):
+        """Handle image URL or base64 from JSON input"""
+        if not value:
+            return value
+        
+        # Check for local file paths (mobile devices)
+        if isinstance(value, str) and value.startswith('file://'):
+            raise serializers.ValidationError(
+                "Local file paths (file://) cannot be accessed from the server. "
+                "Please either: (1) Convert the image to base64 format, or "
+                "(2) Upload the file using multipart/form-data."
+            )
+        
+        if isinstance(value, str):
+            if value.startswith('http://') or value.startswith('https://'):
+                # Store HTTP URLs directly
+                return value
+            elif value.startswith('data:image'):
+                # Handle base64 data URI - return as-is for URLField storage
+                # This makes the image accessible as a data URL
+                return value
+        
+        return value
 
     def create(self, validated_data):
         """Create a new outgoing package with 'Sent' status"""
@@ -458,6 +482,9 @@ class SendPackageSerializer(serializers.Serializer):
                 qbox = Qbox.objects.get(qbox_id=qbox_id)
             except Qbox.DoesNotExist:
                 pass
+        
+        # Extract package image
+        package_image = validated_data.pop('qboxImage', '')
         
         # Create PackageDetails for the package
         details_data = {
@@ -480,6 +507,8 @@ class SendPackageSerializer(serializers.Serializer):
             details=details,
             qbox=qbox,
             driver_name=validated_data.pop('fullName', ''),
+            description=validated_data.pop('packageDescription', ''),
+            package_image=package_image,
             # Store additional info in city field as it's not used for outgoing
             city=f"Value: {validated_data.pop('packageItemValue', '')} {validated_data.pop('currency', '')}",
         )
@@ -488,7 +517,7 @@ class SendPackageSerializer(serializers.Serializer):
 
 class ReturnPackageSerializer(serializers.Serializer):
     """Serializer for creating a Return Package with camelCase field names"""
-    returnPackageImage = serializers.CharField(max_length=500, required=True, help_text="URL or file path of the return package image")
+    returnPackageImage = serializers.CharField(max_length=500, required=True, help_text="URL or base64 data URI of the return package image (http://..., https://..., or data:image/...;base64,...)")
     packageDescription = serializers.CharField(required=True, help_text="Description of the return package")
     packageItemValue = serializers.DecimalField(max_digits=10, decimal_places=2, required=True, help_text="Value of the package item")
     currency = serializers.CharField(max_length=10, required=True, help_text="Currency code (e.g., SAR)")
@@ -496,8 +525,35 @@ class ReturnPackageSerializer(serializers.Serializer):
     packageType = serializers.CharField(max_length=50, required=True, help_text="Type of package")
     pinCode = serializers.CharField(max_length=20, required=True, help_text="PIN code for return")
 
+    def validate_returnPackageImage(self, value):
+        """Handle image URL or base64 from JSON input"""
+        if not value:
+            return value
+        
+        # Check for local file paths (mobile devices)
+        if isinstance(value, str) and value.startswith('file://'):
+            raise serializers.ValidationError(
+                "Local file paths (file://) cannot be accessed from the server. "
+                "Please either: (1) Convert the image to base64 format, or "
+                "(2) Upload the file using multipart/form-data."
+            )
+        
+        if isinstance(value, str):
+            if value.startswith('http://') or value.startswith('https://'):
+                # Store HTTP URLs directly
+                return value
+            elif value.startswith('data:image'):
+                # Handle base64 data URI - return as-is for URLField storage
+                # This makes the image accessible as a data URL
+                return value
+        
+        return value
+
     def create(self, validated_data):
         """Create a new outgoing package with 'Return' status"""
+        # Extract package image
+        package_image = validated_data.pop('returnPackageImage', '')
+        
         # Create PackageDetails for the package
         details_data = {
             'package_type': validated_data.pop('packageType', ''),
@@ -515,6 +571,8 @@ class ReturnPackageSerializer(serializers.Serializer):
             package_type='Outgoing',
             shipment_status=Package.ShipmentStatus.SHIPMENT_CREATED,
             details=details,
+            description=validated_data.pop('packageDescription', ''),
+            package_image=package_image,
             # Store PIN code in driver_name field as it's not used for return packages
             driver_name=f"PIN: {validated_data.pop('pinCode', '')}",
             # Store package value and currency in city field as it's not used for outgoing
@@ -551,8 +609,6 @@ class SendPackageResponseSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         """Convert snake_case to camelCase for the response"""
         data = super().to_representation(instance)
-        
-        # Rename fields to camelCase
         camel_case_data = {
             'id': data.get('id'),
             'trackingId': data.get('tracking_id'),
@@ -589,13 +645,9 @@ class ReturnPackageResponseSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         """Convert snake_case to camelCase for the response"""
         data = super().to_representation(instance)
-        
-        # Extract pinCode from driver_name if it exists
         pin_code = None
         if data.get('driver_name') and data.get('driver_name', '').startswith('PIN: '):
             pin_code = data.get('driver_name', '').replace('PIN: ', '')
-        
-        # Rename fields to camelCase
         camel_case_data = {
             'id': data.get('id'),
             'trackingId': data.get('tracking_id'),

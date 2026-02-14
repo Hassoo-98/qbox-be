@@ -139,6 +139,13 @@ class Package(models.Model):
         blank=True,
         help_text="Package description"
     )
+    
+    # Image field for package images (supports URL and base64)
+    package_image = models.URLField(
+        blank=True,
+        default="",
+        help_text="Package image URL - http://..., https://..., or base64 data URI"
+    )
 
     # Payment fields for outgoing packages
     payment_method = models.CharField(

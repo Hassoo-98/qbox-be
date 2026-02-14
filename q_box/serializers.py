@@ -5,8 +5,6 @@ from io import BytesIO
 from django.core.files import File
 from django.conf import settings
 import requests
-
-
 class QboxSerializer(serializers.ModelSerializer):
     packages = serializers.SerializerMethodField()
     qbox_image_url = serializers.SerializerMethodField()
@@ -40,39 +38,22 @@ class QboxSerializer(serializers.ModelSerializer):
         if not value:
             return value
         
-        # If it's a URL string, download and save the file
+        # If it's a URL string, check for local file paths
         if isinstance(value, str):
+            # Check for local file paths (mobile devices)
+            if value.startswith('file://'):
+                raise serializers.ValidationError(
+                    "Local file paths (file://) cannot be accessed from the server. "
+                    "Please either: (1) Convert the image to base64 format, or "
+                    "(2) Upload the file using multipart/form-data."
+                )
+            
             if value.startswith('http://') or value.startswith('https://'):
-                try:
-                    response = requests.get(value)
-                    if response.status_code == 200:
-                        from django.core.files.base import ContentFile
-                        import os
-                        filename = value.split('/')[-1].split('?')[0]
-                        # Generate unique filename
-                        import uuid
-                        ext = filename.split('.')[-1] if '.' in filename else 'jpg'
-                        filename = f"{uuid.uuid4().hex}.{ext}"
-                        return ContentFile(response.content, name=filename)
-                except Exception as e:
-                    raise serializers.ValidationError(f"Failed to download image from URL: {str(e)}")
+     
+                return value
             elif value.startswith('data:image'):
-                # Handle base64 data URI
-                import base64
-                from django.core.files.base import ContentFile
-                import uuid
-                # Remove data URI prefix
-                base64_data = value.split(',')[1] if ',' in value else value
-                image_data = base64.b64decode(base64_data)
-                ext = 'jpg'
-                if 'png' in value:
-                    ext = 'png'
-                elif 'gif' in value:
-                    ext = 'gif'
-                elif 'webp' in value:
-                    ext = 'webp'
-                filename = f"{uuid.uuid4().hex}.{ext}"
-                return ContentFile(image_data, name=filename)
+             
+                return value
         
         return value
     
@@ -135,38 +116,22 @@ class QboxCreateSerializer(serializers.ModelSerializer):
         if not value:
             return value
         
-        # If it's a URL string, download and save the file
+        # Check for local file paths (mobile devices)
+        if isinstance(value, str) and value.startswith('file://'):
+            raise serializers.ValidationError(
+                "Local file paths (file://) cannot be accessed from the server. "
+                "Please either: (1) Convert the image to base64 format, or "
+                "(2) Upload the file using multipart/form-data."
+            )
+        
         if isinstance(value, str):
             if value.startswith('http://') or value.startswith('https://'):
-                try:
-                    response = requests.get(value)
-                    if response.status_code == 200:
-                        from django.core.files.base import ContentFile
-                        import uuid
-                        import os
-                        filename = value.split('/')[-1].split('?')[0]
-                        ext = filename.split('.')[-1] if '.' in filename and len(filename.split('.')[-1]) <= 5 else 'jpg'
-                        filename = f"{uuid.uuid4().hex}.{ext}"
-                        return ContentFile(response.content, name=filename)
-                except Exception as e:
-                    raise serializers.ValidationError(f"Failed to download image from URL: {str(e)}")
+                # Store HTTP URLs directly
+                return value
             elif value.startswith('data:image'):
-                # Handle base64 data URI
-                import base64
-                from django.core.files.base import ContentFile
-                import uuid
-                # Remove data URI prefix
-                base64_data = value.split(',')[1] if ',' in value else value
-                image_data = base64.b64decode(base64_data)
-                ext = 'jpg'
-                if 'png' in value:
-                    ext = 'png'
-                elif 'gif' in value:
-                    ext = 'gif'
-                elif 'webp' in value:
-                    ext = 'webp'
-                filename = f"{uuid.uuid4().hex}.{ext}"
-                return ContentFile(image_data, name=filename)
+                # Handle base64 data URI - return as-is for URLField storage
+                # This makes the image accessible as a data URL
+                return value
         
         return value
     
@@ -208,37 +173,22 @@ class QboxUpdateSerializer(serializers.ModelSerializer):
         if not value:
             return value
         
-        # If it's a URL string, download and save the file
+        # Check for local file paths (mobile devices)
+        if isinstance(value, str) and value.startswith('file://'):
+            raise serializers.ValidationError(
+                "Local file paths (file://) cannot be accessed from the server. "
+                "Please either: (1) Convert the image to base64 format, or "
+                "(2) Upload the file using multipart/form-data."
+            )
+        
         if isinstance(value, str):
             if value.startswith('http://') or value.startswith('https://'):
-                try:
-                    response = requests.get(value)
-                    if response.status_code == 200:
-                        from django.core.files.base import ContentFile
-                        import uuid
-                        import os
-                        filename = value.split('/')[-1].split('?')[0]
-                        ext = filename.split('.')[-1] if '.' in filename and len(filename.split('.')[-1]) <= 5 else 'jpg'
-                        filename = f"{uuid.uuid4().hex}.{ext}"
-                        return ContentFile(response.content, name=filename)
-                except Exception as e:
-                    raise serializers.ValidationError(f"Failed to download image from URL: {str(e)}")
+                # Store HTTP URLs directly
+                return value
             elif value.startswith('data:image'):
-                # Handle base64 data URI
-                import base64
-                from django.core.files.base import ContentFile
-                import uuid
-                base64_data = value.split(',')[1] if ',' in value else value
-                image_data = base64.b64decode(base64_data)
-                ext = 'jpg'
-                if 'png' in value:
-                    ext = 'png'
-                elif 'gif' in value:
-                    ext = 'gif'
-                elif 'webp' in value:
-                    ext = 'webp'
-                filename = f"{uuid.uuid4().hex}.{ext}"
-                return ContentFile(image_data, name=filename)
+                # Handle base64 data URI - return as-is for URLField storage
+                # This makes the image accessible as a data URL
+                return value
         
         return value
     
@@ -474,8 +424,6 @@ class QboxAccessQRCodeUpdateSerializer(serializers.ModelSerializer):
             "max_users", "duration_type", "valid_duration",
             "is_active"
         ]
-
-
 class QboxAccessUserSerializer(serializers.ModelSerializer):
     qr_code_name = serializers.CharField(source='qr_code.name', read_only=True)
     qbox_id = serializers.CharField(source='qr_code.qbox.qbox_id', read_only=True)
@@ -488,8 +436,6 @@ class QboxAccessUserSerializer(serializers.ModelSerializer):
             "accessed_at", "access_type"
         ]
         read_only_fields = ["id", "accessed_at"]
-
-
 class QboxAccessQRCodeHistorySerializer(serializers.ModelSerializer):
     """
     Serializer for QR Code History Log

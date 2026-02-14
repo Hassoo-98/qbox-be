@@ -86,43 +86,48 @@ class HomeOwnerListAPIView(generics.ListAPIView):
             }
         })
 
-
 class HomeOwnerCreateAPIView(generics.CreateAPIView):
-    '''
-    Post: Create a new home owner
-    '''
-    queryset = CustomHomeOwner.objects.all()
+    """
+    POST: Register new home owner + link QBox + optional base64 image
+    """
+    queryset = CustomHomeOwner.objects.none()
     serializer_class = HomeOwnerCreateSerializer
-    permission_classes = [] 
-    authentication_classes = [] 
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
 
     @swagger_auto_schema(
-        **swagger.create_operation(
-            summary="Create a new home owner",
-            description="Register a new home owner with personal information and property details.",
-            serializer=HomeOwnerCreateSerializer
-        )
+        operation_summary="Register New Home Owner",
+        operation_description=(
+            "Creates a new home owner account, links it to a QBox device, "
+            "and optionally attaches an installation photo.\n\n"
+            "**Image upload options (in JSON payload):**\n"
+            "- `installation_image_base64`: base64 data URI (data:image/jpeg;base64,...)\n"
+            "  → Recommended only for small images (< 2–3 MB)\n"
+            "- For large images or better performance: upload separately to `/api/media/upload/` "
+            "and send the returned URL in `installation.qbox_image_url` (future field)\n\n"
+            "All fields are sent as **application/json**."
+        ),
+        request_body=HomeOwnerCreateSerializer,
+        responses={
+            201: openapi.Response(
+                description="Home owner created successfully",
+                schema=HomeOwnerSerializer
+            ),
+            400: ValidationErrorResponse,
+        }
     )
     def post(self, request, *args, **kwargs):
-        try:
-            serializer = self.get_serializer(data=request.data)
-            if serializer.is_valid(raise_exception=True):
-                home_owner = serializer.save()
-                home_owner_data = HomeOwnerSerializer(home_owner).data
-                return Response({
-                    "success": True,
-                    "statusCode": status.HTTP_201_CREATED,
-                    "data": home_owner_data,
-                    "message": "Home Owner created successfully"
-                }, status=status.HTTP_201_CREATED)
-        except Exception as e:
-            return Response({
-                "success": False,
-                "statusCode": status.HTTP_400_BAD_REQUEST,
-                "data": None,
-                "message": str(e)
-            }, status=status.HTTP_400_BAD_REQUEST)
-
+        serializer = self.get_serializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        
+        homeowner = serializer.save()
+        
+        return Response({
+            "success": True,
+            "statusCode": status.HTTP_201_CREATED,
+            "data": HomeOwnerSerializer(homeowner, context={'request': request}).data,
+            "message": "Home owner registered and QBox linked successfully"
+        }, status=status.HTTP_201_CREATED)
 
 class HomeOwnerDetailAPIView(generics.RetrieveAPIView):
     '''

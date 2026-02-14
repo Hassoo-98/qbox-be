@@ -208,16 +208,29 @@ class MediaViewSet(viewsets.ModelViewSet):
     )
     @action(detail=False, methods=['post'], url_path='upload')
     def upload(self, request):
-        """
-        Custom action for uploading a single file
-        POST /api/media/upload/
-        """
-        serializer = self.get_serializer(data=request.data)
+        serializer = MediaUploadSerializer(data=request.data)
         if serializer.is_valid():
-            media = serializer.save()
-            response_serializer = MediaSerializer(media, context={'request': request})
-            return Response(response_serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            media = serializer.save(
+                uploaded_by=request.user.username if request.user.is_authenticated else "anonymous"
+            )
+
+            # Return clean, frontend-friendly response
+            response_data = MediaSerializer(media, context={'request': request}).data
+
+            return Response({
+                "success": True,
+                "statusCode": status.HTTP_201_CREATED,
+                "data": response_data,
+                "message": "Media uploaded successfully"
+            }, status=status.HTTP_201_CREATED)
+
+        return Response({
+            "success": False,
+            "statusCode": status.HTTP_400_BAD_REQUEST,
+            "data": None,
+            "message": "Validation failed",
+            "errors": serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
     
     @swagger_auto_schema(
         operation_description="Get download URL for a media file.",
