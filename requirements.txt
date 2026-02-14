@@ -27,4 +27,10 @@ typing_extensions==4.15.0
 uritemplate==4.2.0
 urllib3==2.6.3
 django-cors-headers==4.9.0
+<<<<<<< HEAD
 
+=======
+ 
+ 
+ 
+>>>>>>> befb6db (Remove ignored files from tracking)
